@@ -73,6 +73,14 @@ function DrawEngine(context2D) {
     this.ctx.arc(vec.x, vec.y, scale, 0, Math.PI*2)
     this.ctx.fill()
   }
+
+  this.drawCircle = (vec = new Vec(10, 10), scale = 10, thickness = 2, color = '#fff') => {
+    this.ctx.beginPath()
+    this.ctx.strokeStyle = color
+    this.ctx.lineWidth = thickness
+    this.ctx.arc(vec.x, vec.y, scale, 0, Math.PI*2)
+    this.ctx.stroke()
+  }
   
   this.drawVector = (vec1 = new Vec(), vec2 = new Vec(50, 50), scale = 10, color = '#fff', mode = 0) => {
     this.ctx.beginPath()
@@ -113,26 +121,22 @@ function DrawEngine(context2D) {
 
 // ---- PARTICLES ----
 
-function Particle({coords = new Vec(), mass = 1, forces = new Vec(), velocity = new Vec(), radius = 10, color = '#fff'} = {}) {
+function Particle({coords = new Vec(), mass = 1, velocity = new Vec(), radius = 10, color = '#fff'} = {}) {
   this.coords = coords
   this.mass = mass
-  this.forces = forces
   this.velocity = velocity
   this.radius = radius
   this.color = color
 
   this.orbitLine = []
 
-  this.gravityForce = particle => {
-    const vec = particle.coords.subtract(this.coords),
-          force = G * 
-  }
-
   this.move = () => {
-    this.coords.set((coord, dim) => coord + this.forces[dim] / this.mass * SIMULATION_SPEED)
+    this.coords.set((coord, dim) => coord + this.velocity[dim] * SIMULATION_SPEED)
+
+    // if(this.orbitLine.length < 1000) this.orbitLine.push(this.coords.copy())
   }
 
-  this.impulse = vec => this.forces = this.forces.add(vec)
+  this.impulse = vec => this.velocity = this.velocity.add(vec)
 }
 
 // ---- CAMERA ----
@@ -158,12 +162,34 @@ function Camera({coords = new Vec(), scale = 1, particles, drawEngine} = {}) {
     for(const particle of particles) {
 
       const coords = this.mapToCameraCoords(particle.coords),
-            forcesCoords = this.mapToCameraCoords(new Vec().set((value, dim) => particle.coords[dim] + particle.forces[dim] / particle.mass)),
+            velocityCoords = this.mapToCameraCoords(new Vec().set((value, dim) => particle.coords[dim] + particle.velocity[dim] * SIMULATION_SPEED)),
             scale = particle.radius * this.scale
 
-      // this.drawEngine.drawBall(coords, scale < 5 ? 5 : scale, particle.color)
-      this.drawEngine.drawBall(coords, particle.radius, particle.color)
-      this.drawEngine.drawVector(coords, forcesCoords, 2, '#fff', 0)
+      if(scale < 5) {
+        this.drawEngine.drawBall(coords, 5, particle.color)
+        this.drawEngine.drawCircle(coords, 7, 1, 'white')
+      }
+      else {
+        this.drawEngine.drawBall(coords, scale, particle.color)
+      }
+
+      this.drawEngine.drawVector(coords, velocityCoords, 2, '#fff', 0)
+
+      /* this.drawEngine.ctx.beginPath()
+      particle.orbitLine.forEach((coords, index) => {
+        const {x, y} = this.mapToCameraCoords(coords)
+
+        if(index === 1) {
+          this.drawEngine.ctx.lineTo(x, y)
+          return
+        }
+
+        this.drawEngine.ctx.lineTo(x, y)
+      })
+
+      this.drawEngine.ctx.strokeStyle = particle.color
+      this.drawEngine.ctx.lineWidth = 1
+      this.drawEngine.ctx.stroke() */
     }
 
   }
@@ -176,21 +202,21 @@ function Camera({coords = new Vec(), scale = 1, particles, drawEngine} = {}) {
   })
 
   document.body.addEventListener("mousedown", event => {
-    if(event.buttons === 1) this.mousemove = true
+    if(event.buttons === 1 && event.shiftKey) this.mousemove = true
 
     this.mouseDelta.set(event.offsetX, event.offsetY)
     this.anchoredCoords = this.coords.copy()
   })
 
   document.body.addEventListener("mouseup", event => {
-    if(event.buttons === 0) this.mousemove = false
+    if(event.buttons === 0 && event.shiftKey) this.mousemove = false
 
     sessionStorage['camera_x'] = this.coords.x
     sessionStorage['camera_y'] = this.coords.y
   })
 
   document.body.addEventListener("mousemove", event => {
-    if(this.mousemove === true) {
+    if(this.mousemove === true && event.shiftKey) {
 
       const delta = new Vec(event.offsetX, event.offsetY).subtract(this.mouseDelta)
       this.coords = this.anchoredCoords.subtract(delta.divide(this.scale))
@@ -210,84 +236,112 @@ const G = 6.7e-11,
         drawEngine: new DrawEngine(ctx)
       })
 
-let fps = 60, // count per second
-    // SIMULATION_SPEED = 3600 * 24 * 31 * 12
-    SIMULATION_SPEED = 3600 * 24 * 31 * 12
+const tick_speed = 120, // count per second
+    fps = 60
 
-particles.push(new Particle({
-  mass: 2e30,
-  color: 'yellow',
-  radius: 30
-}))
+let SIMULATION_SPEED = 3600 * 24
 
-particles.push(new Particle({
-  coords: new Vec(AU, 0),
-  mass: 6e24,
-  forces: new Vec(0, 30e3),
-  color: 'aqua',
-  radius: 16
-}))
+const sun = new Particle({
+              mass: 2e30,
+              color: 'yellow',
+              radius: 7e8
+            }),
 
-particles.push(new Particle({
-  coords: new Vec(1.5 * AU, 0),
-  mass: 6e23,
-  forces: new Vec(0, 24e3),
-  color: 'darkred',
-  radius: 12
-}))
+      earth = new Particle({
+              coords: new Vec(AU, 0),
+              mass: 6e24,
+              velocity: new Vec(0, 30e3),
+              color: 'aqua',
+              radius: 6.4e6
+            }),
 
-particles.push(new Particle({
-  coords: new Vec(.4 * AU, 0),
-  mass: 3e23,
-  forces: new Vec(0, 47e3),
-  color: 'darkgray',
-  radius: 8
-}))
+      mars = new Particle({
+              coords: new Vec(1.5 * AU, 0),
+              mass: 6e23,
+              velocity: new Vec(0, 24e3),
+              color: 'darkred',
+              radius: 3.3e6
+            }),
 
-particles.push(new Particle({
-  coords: new Vec(.7 * AU, 0),
-  mass: 5e24,
-  forces: new Vec(0, 35e3),
-  color: 'white',
-  radius: 14
-}))
+      mercury = new Particle({
+              coords: new Vec(.4 * AU, 0),
+              mass: 3e23,
+              velocity: new Vec(0, 47e3),
+              color: 'darkgray',
+              radius: 2.4e6
+            }),
 
+      venus = new Particle({
+              coords: new Vec(.7 * AU, 0),
+              mass: 5e24,
+              velocity: new Vec(0, 35e3),
+              color: 'white',
+              radius: 6e6
+            }),
 
-camera.render()
+      moon = new Particle({
+              coords: new Vec(AU + 380e6, 0),
+              mass: 7e22,
+              velocity: new Vec(0, 30e3 + 1000),
+              color: 'gray',
+              radius: 1.7e6
+            })
+
+particles.push(sun, earth, moon, mars, mercury, venus)
+
+// earth.impulse(new Vec(20e3, -5.233e3))
+venus.impulse(new Vec(-40e3, -25e3))
+camera.coords = earth.coords
 
 // LOOP
 
 const loop = setInterval(() => {
-  camera.drawEngine.clear()
 
-  // for(const particle of particles) {
+  for(const particle of particles) {
+    for(const particle2 of particles) {
+      if(particle === particle2) continue
 
-    // for(const particle2 of particles) {
-    //   if(particle !== particle2) {
+      const vec = particle2.coords.subtract(particle.coords),
+            gravityForce = G * particle.mass * particle2.mass / vec.module()**2,
+            velocity = new Vec().set((value, dim) => ({x: Math.sin, y: Math.cos})[dim](vec.angle()) * gravityForce / particle.mass * SIMULATION_SPEED)
 
-    //     const r = distance(particle2.x, particle2.y, particle.x, particle.y),
-    //           force = particle.mass * particle2.mass / r**2 * GRAVITY_CONST * SIMULATION_SPEED,
-    //           angle = radToDeg(Math.atan2(particle2.x - particle.x, particle2.y - particle.y)),
-    //           force_x = Math.sin(degToRad(angle)) * force,
-    //           force_y = Math.cos(degToRad(angle)) * force
+      particle.impulse(velocity)
+    }
+  }
 
-    //     particle.impulse(force_x, force_y)
-    //   }
-    // }
+  for(const particle of particles) particle.move(particles)
 
-    // for(const particle2 of particles) {
-    //   if(particle === particle2) continue
+}, 1000 / tick_speed)
 
-    //   const vec = particle2.coords.subtract(particle.coords),
-    //         gravity = G * particle.mass * particle2.mass / vec.module()**2,
-    //         forces = new Vec(Math.sin(vec.angle()) * gravity, Math.cos(vec.angle()) * gravity)
-
-    //   particle.impulse(forces)
-    // }
-  // }
-
-  for(const particle of particles) particle.move()
-  camera.render()
-  camera.drawEngine.drawCursor()
-
+const render_loop = setInterval(() => {
+  window.requestAnimationFrame(() => {
+    camera.drawEngine.clear()
+    camera.render()
+    camera.drawEngine.drawCursor()
+  })
 }, 1000 / fps)
+
+// ---- SETTINGS ----
+
+const settings = QuickSettings.create()
+
+settings.addText('Simulation Speed')
+settings.addText('Focus body')
+settings.addHTML('HTML', '<s>html</s>')
+
+document.querySelector('#null.qs_main').addEventListener('focusout', ({target}) => {
+  switch (target.id) {
+    case 'Simulation Speed':
+      
+      const value = eval(target.value)
+      if(isNaN(+value) === false) SIMULATION_SPEED = value
+      break;
+
+    case 'Focus body':
+      const coords = eval(target.value)
+      camera.coords = coords
+      break;
+  }
+})
+
+settings.saveInLocalStorage('game_settings')
