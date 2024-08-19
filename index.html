@@ -7,10 +7,37 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  
-  <canvas id="main-frame"></canvas>
 
-  <script src="https://cdn.jsdelivr.net/npm/quicksettings@latest/quicksettings.min.js"></script>
-  <script src="index.js"></script>
+  <div id="pane-settings-container"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/tweakpane@3.1.4/dist/tweakpane.min.js"></script>
+  <script>
+
+    const pane = new Tweakpane.Pane({title: 'Settings', container: document.querySelector('#pane-settings-container')}),
+          simulationSettingsFolder = pane.addFolder({title: 'Simulation'}),
+          cameraSettingsFolder = pane.addFolder({title: 'Camera'}),
+          params = {
+            tickSpeed: 120,
+            fps: 60,
+            simulationSpeed: 3600 * 24,
+            focusBody: 'none',
+            cameraCoords: {x: 0, y: 0},
+            cameraScale: 0
+          }
+
+    simulationSettingsFolder.addInput(params, 'tickSpeed', {min: 0, max: 1000, step: 1})
+    simulationSettingsFolder.addInput(params, 'fps', {min: 0, max: 1000, step: 1})
+    simulationSettingsFolder.addInput(params, 'simulationSpeed', {min: 0, max: 3600 * 24 * 365, step: 1})
+    cameraSettingsFolder.addInput(params, 'focusBody', {options: {none: 'none', earth: 'earth', moon: 'moon'}})
+    cameraSettingsFolder.addInput(params, 'cameraCoords', {x: {step: 1}, y: {step: 1}})
+    cameraSettingsFolder.addInput(params, 'cameraScale')
+
+    if(sessionStorage['gameSettings'] !== undefined) pane.importPreset(JSON.parse(sessionStorage['gameSettings']))
+
+    pane.on('change', () => {
+      sessionStorage['gameSettings'] = JSON.stringify(pane.exportPreset())
+    })
+
+  </script>
 </body>
 </html>
