@@ -131,7 +131,7 @@ function Particle({coords = new Vec(), mass = 1, velocity = new Vec(), radius = 
   this.orbitLine = []
 
   this.move = () => {
-    this.coords.set((coord, dim) => coord + this.velocity[dim] * SIMULATION_SPEED)
+    this.coords.set((coord, dim) => coord + this.velocity[dim] * GAME_PARAMS.simulationSpeed)
 
     // if(this.orbitLine.length < 1000) this.orbitLine.push(this.coords.copy())
   }
@@ -162,7 +162,7 @@ function Camera({coords = new Vec(), scale = 1, particles, drawEngine} = {}) {
     for(const particle of particles) {
 
       const coords = this.mapToCameraCoords(particle.coords),
-            velocityCoords = this.mapToCameraCoords(new Vec().set((value, dim) => particle.coords[dim] + particle.velocity[dim] * SIMULATION_SPEED)),
+            velocityCoords = this.mapToCameraCoords(new Vec().set((value, dim) => particle.coords[dim] + particle.velocity[dim] * GAME_PARAMS.simulationSpeed)),
             scale = particle.radius * this.scale
 
       if(scale < 5) {
@@ -224,22 +224,47 @@ function Camera({coords = new Vec(), scale = 1, particles, drawEngine} = {}) {
   })
 }
 
+// ---- SETTINGS ----
+
+const pane = new Tweakpane.Pane({title: 'Settings', container: document.querySelector('#pane-settings-container')}),
+      simulationSettingsFolder = pane.addFolder({title: 'Simulation'}),
+      cameraSettingsFolder = pane.addFolder({title: 'Camera'}),
+      GAME_PARAMS = {
+        tickSpeed: 120,
+        fps: 60,
+        simulationSpeed: 3600 * 24,
+        focusBody: 'none',
+        cameraCoords: {x: 0, y: 0},
+        cameraScale: 4.65e-10,
+
+        GRAVITY_CONST: 6.7e-11,
+        AU: 150e9
+      }
+
+simulationSettingsFolder.addInput(GAME_PARAMS, 'tickSpeed', {min: 0, max: 1000, step: 1}).on('change')
+simulationSettingsFolder.addInput(GAME_PARAMS, 'fps', {min: 0, max: 1000, step: 1})
+simulationSettingsFolder.addInput(GAME_PARAMS, 'simulationSpeed', {min: 0, max: 3600 * 24 * 365, step: 1})
+simulationSettingsFolder.addInput(GAME_PARAMS, 'GRAVITY_CONST', {format: value => value.toExponential()})
+simulationSettingsFolder.addInput(GAME_PARAMS, 'AU', {format: value => value.toExponential()})
+cameraSettingsFolder.addInput(GAME_PARAMS, 'focusBody', {options: {none: 'none', earth: 'earth', moon: 'moon'}})
+cameraSettingsFolder.addInput(GAME_PARAMS, 'cameraCoords', {x: {step: 1}, y: {step: 1}})
+cameraSettingsFolder.addInput(GAME_PARAMS, 'cameraScale')
+
+if(sessionStorage['gameSettings'] !== undefined) pane.importPreset(JSON.parse(sessionStorage['gameSettings']))
+
+pane.on('change', () => {
+  sessionStorage['gameSettings'] = JSON.stringify(pane.exportPreset())
+})
+
 //  ---- PROGRAM ----
 
-const G = 6.7e-11,
-      AU = 150e9, 
-      particles = [],
+const particles = [],
       camera = new Camera({
-        coords: new Vec(+sessionStorage['camera_x'] || 0, +sessionStorage['camera_y'] || 0),
-        scale: +sessionStorage['camera_scale'] || 1,
+        coords: new Vec(GAME_PARAMS.cameraCoords.x, GAME_PARAMS.cameraCoords.y),
+        scale: GAME_PARAMS.cameraScale,
         particles,
         drawEngine: new DrawEngine(ctx)
       })
-
-const tick_speed = 120, // count per second
-    fps = 60
-
-let SIMULATION_SPEED = 3600 * 24
 
 const sun = new Particle({
               mass: 2e30,
@@ -248,7 +273,7 @@ const sun = new Particle({
             }),
 
       earth = new Particle({
-              coords: new Vec(AU, 0),
+              coords: new Vec(GAME_PARAMS.AU, 0),
               mass: 6e24,
               velocity: new Vec(0, 30e3),
               color: 'aqua',
@@ -256,7 +281,7 @@ const sun = new Particle({
             }),
 
       mars = new Particle({
-              coords: new Vec(1.5 * AU, 0),
+              coords: new Vec(1.5 * GAME_PARAMS.AU, 0),
               mass: 6e23,
               velocity: new Vec(0, 24e3),
               color: 'darkred',
@@ -264,7 +289,7 @@ const sun = new Particle({
             }),
 
       mercury = new Particle({
-              coords: new Vec(.4 * AU, 0),
+              coords: new Vec(.4 * GAME_PARAMS.AU, 0),
               mass: 3e23,
               velocity: new Vec(0, 47e3),
               color: 'darkgray',
@@ -272,7 +297,7 @@ const sun = new Particle({
             }),
 
       venus = new Particle({
-              coords: new Vec(.7 * AU, 0),
+              coords: new Vec(.7 * GAME_PARAMS.AU, 0),
               mass: 5e24,
               velocity: new Vec(0, 35e3),
               color: 'white',
@@ -280,7 +305,7 @@ const sun = new Particle({
             }),
 
       moon = new Particle({
-              coords: new Vec(AU + 380e6, 0),
+              coords: new Vec(GAME_PARAMS.AU + 380e6, 0),
               mass: 7e22,
               velocity: new Vec(0, 30e3 + 1000),
               color: 'gray',
@@ -295,53 +320,90 @@ camera.coords = earth.coords
 
 // LOOP
 
-const loop = setInterval(() => {
+let loop, renderLoop;
 
-  for(const particle of particles) {
-    for(const particle2 of particles) {
-      if(particle === particle2) continue
+function setLoop(ms) {
+  if(loop !== undefined) clearInterval(loop)
 
-      const vec = particle2.coords.subtract(particle.coords),
-            gravityForce = G * particle.mass * particle2.mass / vec.module()**2,
-            velocity = new Vec().set((value, dim) => ({x: Math.sin, y: Math.cos})[dim](vec.angle()) * gravityForce / particle.mass * SIMULATION_SPEED)
+  loop = setInterval(() => {
 
-      particle.impulse(velocity)
+    for(const particle of particles) {
+      for(const particle2 of particles) {
+        if(particle === particle2) continue
+  
+        const vec = particle2.coords.subtract(particle.coords),
+              gravityForce = GAME_PARAMS.GRAVITY_CONST * particle.mass * particle2.mass / vec.module()**2,
+              velocity = new Vec().set((value, dim) => ({x: Math.sin, y: Math.cos})[dim](vec.angle()) * gravityForce / particle.mass * GAME_PARAMS.simulationSpeed)
+  
+        particle.impulse(velocity)
+      }
     }
-  }
+  
+    for(const particle of particles) particle.move(particles)
+  
+  }, ms)
+}
 
-  for(const particle of particles) particle.move(particles)
+function setRenderLoop(ms) {
+  if(renderLoop !== undefined) clearInterval(renderLoop)
 
-}, 1000 / tick_speed)
+  renderLoop = setInterval(() => {
+    window.requestAnimationFrame(() => {
+      camera.drawEngine.clear()
+      camera.render()
+      camera.drawEngine.drawCursor()
+    })
+  }, ms)
+}
 
-const render_loop = setInterval(() => {
-  window.requestAnimationFrame(() => {
-    camera.drawEngine.clear()
-    camera.render()
-    camera.drawEngine.drawCursor()
-  })
-}, 1000 / fps)
+setLoop(1000 / GAME_PARAMS.tickSpeed)
+setRenderLoop(1000 / GAME_PARAMS.fps)
 
-// ---- SETTINGS ----
+// const loop = setInterval(() => {
 
-const settings = QuickSettings.create()
+//   for(const particle of particles) {
+//     for(const particle2 of particles) {
+//       if(particle === particle2) continue
 
-settings.addText('Simulation Speed')
-settings.addText('Focus body')
-settings.addHTML('HTML', '<s>html</s>')
+//       const vec = particle2.coords.subtract(particle.coords),
+//             gravityForce = GAME_PARAMS.GRAVITY_CONST * particle.mass * particle2.mass / vec.module()**2,
+//             velocity = new Vec().set((value, dim) => ({x: Math.sin, y: Math.cos})[dim](vec.angle()) * gravityForce / particle.mass * GAME_PARAMS.simulationSpeed)
 
-document.querySelector('#null.qs_main').addEventListener('focusout', ({target}) => {
-  switch (target.id) {
-    case 'Simulation Speed':
+//       particle.impulse(velocity)
+//     }
+//   }
+
+//   for(const particle of particles) particle.move(particles)
+
+// }, 1000 / GAME_PARAMS.tickSpeed)
+
+// const render_loop = setInterval(() => {
+//   window.requestAnimationFrame(() => {
+//     camera.drawEngine.clear()
+//     camera.render()
+//     camera.drawEngine.drawCursor()
+//   })
+// }, 1000 / GAME_PARAMS.fps)
+
+// const settings = QuickSettings.create()
+
+// settings.addText('Simulation Speed')
+// settings.addText('Focus body')
+// settings.addHTML('HTML', '<s>html</s>')
+
+// document.querySelector('#null.qs_main').addEventListener('focusout', ({target}) => {
+//   switch (target.id) {
+//     case 'Simulation Speed':
       
-      const value = eval(target.value)
-      if(isNaN(+value) === false) SIMULATION_SPEED = value
-      break;
+//       const value = eval(target.value)
+//       if(isNaN(+value) === false) GAME_PARAMS.simulationSpeed = value
+//       break;
 
-    case 'Focus body':
-      const coords = eval(target.value)
-      camera.coords = coords
-      break;
-  }
-})
+//     case 'Focus body':
+//       const coords = eval(target.value)
+//       camera.coords = coords
+//       break;
+//   }
+// })
 
-settings.saveInLocalStorage('game_settings')
+// settings.saveInLocalStorage('game_settings')
