@@ -141,7 +141,7 @@ function Particle({coords = new Vec(), mass = 1, velocity = new Vec(), radius = 
 
 // ---- CAMERA ----
 
-function Camera({coords = new Vec(), scale = 1, particles, drawEngine} = {}) {
+function Camera({coords = new Vec(), scale = 1, particles, drawEngine, pane} = {}) {
   this.coords = coords
   this.scale = scale
   this.particles = particles
@@ -150,6 +150,8 @@ function Camera({coords = new Vec(), scale = 1, particles, drawEngine} = {}) {
   this.mousemove = false
   this.mouseDelta = new Vec()
   this.anchoredCoords = new Vec()
+
+  this.pane = pane
 
   this.mapToCameraCoords = vec => {
     return vec.copy().set((value, dim) => (value - this.coords[dim]) * this.scale + {x: cnvs.width, y: cnvs.height}[dim] / 2)
@@ -175,6 +177,11 @@ function Camera({coords = new Vec(), scale = 1, particles, drawEngine} = {}) {
 
       this.drawEngine.drawVector(coords, velocityCoords, 2, '#fff', 0)
 
+      if(this.pane) {
+        GAME_PARAMS.cameraCoords.x = this.coords.x
+        GAME_PARAMS.cameraCoords.y = this.coords.y
+      }
+
       /* this.drawEngine.ctx.beginPath()
       particle.orbitLine.forEach((coords, index) => {
         const {x, y} = this.mapToCameraCoords(coords)
@@ -198,7 +205,10 @@ function Camera({coords = new Vec(), scale = 1, particles, drawEngine} = {}) {
     if(event.deltaY > 0) this.scale /= 2
     else if(event.deltaY < 0) this.scale *= 2
 
-    sessionStorage['camera_scale'] = this.scale
+    if(this.pane) {
+      this.pane.refresh()
+      // sessionStorage['gameSettings'] = JSON.stringify(this.pane.exportPreset())
+    }
   })
 
   document.body.addEventListener("mousedown", event => {
@@ -211,8 +221,6 @@ function Camera({coords = new Vec(), scale = 1, particles, drawEngine} = {}) {
   document.body.addEventListener("mouseup", event => {
     if(event.buttons === 0 && event.shiftKey) this.mousemove = false
 
-    sessionStorage['camera_x'] = this.coords.x
-    sessionStorage['camera_y'] = this.coords.y
   })
 
   document.body.addEventListener("mousemove", event => {
@@ -230,29 +238,64 @@ const pane = new Tweakpane.Pane({title: 'Settings', container: document.querySel
       simulationSettingsFolder = pane.addFolder({title: 'Simulation'}),
       cameraSettingsFolder = pane.addFolder({title: 'Camera'}),
       GAME_PARAMS = {
-        tickSpeed: 120,
+        tps: 120,
         fps: 60,
         simulationSpeed: 3600 * 24,
         focusBody: 'none',
         cameraCoords: {x: 0, y: 0},
-        cameraScale: 4.65e-10,
+        cameraScale: 5e-10,
 
         GRAVITY_CONST: 6.7e-11,
         AU: 150e9
       }
 
-simulationSettingsFolder.addInput(GAME_PARAMS, 'tickSpeed', {min: 0, max: 1000, step: 1}).on('change')
+simulationSettingsFolder.addInput(GAME_PARAMS, 'tps', {min: 0, max: 1000, step: 1})
 simulationSettingsFolder.addInput(GAME_PARAMS, 'fps', {min: 0, max: 1000, step: 1})
-simulationSettingsFolder.addInput(GAME_PARAMS, 'simulationSpeed', {min: 0, max: 3600 * 24 * 365, step: 1})
+simulationSettingsFolder.addInput(GAME_PARAMS, 'simulationSpeed', {step: 1})
 simulationSettingsFolder.addInput(GAME_PARAMS, 'GRAVITY_CONST', {format: value => value.toExponential()})
 simulationSettingsFolder.addInput(GAME_PARAMS, 'AU', {format: value => value.toExponential()})
-cameraSettingsFolder.addInput(GAME_PARAMS, 'focusBody', {options: {none: 'none', earth: 'earth', moon: 'moon'}})
-cameraSettingsFolder.addInput(GAME_PARAMS, 'cameraCoords', {x: {step: 1}, y: {step: 1}})
-cameraSettingsFolder.addInput(GAME_PARAMS, 'cameraScale')
+cameraSettingsFolder.addInput(GAME_PARAMS, 'focusBody', {options: {Sun: 'sun', Earth: 'earth', Mars: 'mars', Mercury: 'mercury', Venus: 'venus', Moon: 'moon'}})
 
 if(sessionStorage['gameSettings'] !== undefined) pane.importPreset(JSON.parse(sessionStorage['gameSettings']))
 
-pane.on('change', () => {
+pane.on('change', event => {
+
+  if(event.last) {
+    switch (event.presetKey) {
+      case 'fps':
+        if(event.value === 0) clearInterval(renderLoop)
+        setRenderLoop(1000 / event.value)
+        break;
+      case 'tps':
+        if(event.value === 0) clearInterval(renderLoop)
+        setLoop(1000 / event.value)
+        break;
+      case 'focusBody':
+        switch (event.value) {
+          case 'none':
+            break;
+          case 'sun':
+            camera.coords = sun.coords
+            break;
+          case 'earth':
+            camera.coords = earth.coords
+            break;
+          case 'mars':
+            camera.coords = mars.coords
+            break;
+          case 'mercury':
+            camera.coords = mercury.coords
+            break;
+          case 'venus':
+            camera.coords = venus.coords
+            break;
+          case 'moon':
+            camera.coords = moon.coords
+            break;
+        }
+    }
+  }
+  
   sessionStorage['gameSettings'] = JSON.stringify(pane.exportPreset())
 })
 
@@ -263,8 +306,14 @@ const particles = [],
         coords: new Vec(GAME_PARAMS.cameraCoords.x, GAME_PARAMS.cameraCoords.y),
         scale: GAME_PARAMS.cameraScale,
         particles,
-        drawEngine: new DrawEngine(ctx)
+        drawEngine: new DrawEngine(ctx),
+        pane: pane
       })
+
+cameraSettingsFolder.addMonitor(GAME_PARAMS.cameraCoords, 'x', {format: value => value.toExponential()})
+cameraSettingsFolder.addMonitor(GAME_PARAMS.cameraCoords, 'y', {format: value => value.toExponential()})
+cameraSettingsFolder.addMonitor(camera, 'scale', {format: value => value.toExponential()})
+
 
 const sun = new Particle({
               mass: 2e30,
@@ -324,6 +373,7 @@ let loop, renderLoop;
 
 function setLoop(ms) {
   if(loop !== undefined) clearInterval(loop)
+  if(ms === Infinity) return
 
   loop = setInterval(() => {
 
@@ -346,6 +396,7 @@ function setLoop(ms) {
 
 function setRenderLoop(ms) {
   if(renderLoop !== undefined) clearInterval(renderLoop)
+  if(ms === Infinity) return
 
   renderLoop = setInterval(() => {
     window.requestAnimationFrame(() => {
@@ -356,7 +407,7 @@ function setRenderLoop(ms) {
   }, ms)
 }
 
-setLoop(1000 / GAME_PARAMS.tickSpeed)
+setLoop(1000 / GAME_PARAMS.tps)
 setRenderLoop(1000 / GAME_PARAMS.fps)
 
 // const loop = setInterval(() => {
@@ -375,7 +426,7 @@ setRenderLoop(1000 / GAME_PARAMS.fps)
 
 //   for(const particle of particles) particle.move(particles)
 
-// }, 1000 / GAME_PARAMS.tickSpeed)
+// }, 1000 / GAME_PARAMS.tps)
 
 // const render_loop = setInterval(() => {
 //   window.requestAnimationFrame(() => {
@@ -394,7 +445,7 @@ setRenderLoop(1000 / GAME_PARAMS.fps)
 // document.querySelector('#null.qs_main').addEventListener('focusout', ({target}) => {
 //   switch (target.id) {
 //     case 'Simulation Speed':
-      
+
 //       const value = eval(target.value)
 //       if(isNaN(+value) === false) GAME_PARAMS.simulationSpeed = value
 //       break;
