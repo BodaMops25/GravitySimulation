@@ -1,4 +1,4 @@
-import {Vec, GAME_PARAMS} from './helpers.js'
+import {Vec, GAME_PARAMS, number2MS, metricalIMS} from './helpers.js'
 import {DrawEngine, Particle, Camera} from './game.js'
 import {Pane} from './tweakpane-4.0.4.js'
 import * as TweakpaneEssentials from './tweakpane-plugin-essentials-0.2.1.js'
@@ -35,14 +35,12 @@ const particles = [],
         pane: pane,
         options: GAME_PARAMS
       })
-
 const sun = new Particle({
               mass: 2e30,
               color: 'yellow',
               radius: 7e8,
               options: GAME_PARAMS
             }),
-
       earth = new Particle({
               coords: new Vec(GAME_PARAMS.AU, 0),
               mass: 6e24,
@@ -51,7 +49,6 @@ const sun = new Particle({
               radius: 6.4e6,
               options: GAME_PARAMS
             }),
-
       mars = new Particle({
               coords: new Vec(1.5 * GAME_PARAMS.AU, 0),
               mass: 6e23,
@@ -60,7 +57,6 @@ const sun = new Particle({
               radius: 3.3e6,
               options: GAME_PARAMS
             }),
-
       mercury = new Particle({
               coords: new Vec(.4 * GAME_PARAMS.AU, 0),
               mass: 3e23,
@@ -69,7 +65,6 @@ const sun = new Particle({
               radius: 2.4e6,
               options: GAME_PARAMS
             }),
-
       venus = new Particle({
               coords: new Vec(.7 * GAME_PARAMS.AU, 0),
               mass: 5e24,
@@ -78,7 +73,6 @@ const sun = new Particle({
               radius: 6e6,
               options: GAME_PARAMS
             }),
-
       moon = new Particle({
               coords: new Vec(GAME_PARAMS.AU + 380e6, 0),
               mass: 7e22,
@@ -88,9 +82,17 @@ const sun = new Particle({
               options: GAME_PARAMS
             })
 
-            
-
 particles.push(sun, earth, moon, mars, mercury, venus)
+
+for(let i = 0; i < 1; i++) particles.push(new Particle({
+  coords: new Vec(GAME_PARAMS.AU / 10, 0),
+  color: 'purple',
+  radius: 1e3,
+  velocity: new Vec(0, 1e5),
+  options: GAME_PARAMS
+}))
+
+console.log(particles)
 
 // earth.impulse(new Vec(20e3, -5.233e3))
 venus.impulse(new Vec(-40e3, -25e3))
@@ -137,10 +139,10 @@ cameraSettingsFolder.addBinding(GAME_PARAMS, 'focusBody', {options: {none: null,
 })
 
 cameraSettingsFolder.addBinding(GAME_PARAMS, 'focusBodyVelocity', {view: 'graph', readonly: true, min: 0, max: 1e5})
-cameraSettingsFolder.addBinding(GAME_PARAMS, 'focusBodyVelocity', {readonly: true, format: value => value.toFixed()})
-cameraSettingsFolder.addBinding(GAME_PARAMS.cameraCoords, 'x', {format: value => value.toExponential(), readonly: true})
-cameraSettingsFolder.addBinding(GAME_PARAMS.cameraCoords, 'y', {format: value => value.toExponential(), readonly: true})
-cameraSettingsFolder.addBinding(camera, 'scale', {format: value => value.toExponential(), readonly: true})
+cameraSettingsFolder.addBinding(GAME_PARAMS, 'focusBodyVelocity', {readonly: true, format: value => number2MS(value, metricalIMS, 'm/s', 3)})
+cameraSettingsFolder.addBinding(GAME_PARAMS.cameraCoords, 'x', {format: value => number2MS(value, metricalIMS, 'm', 3), readonly: true})
+cameraSettingsFolder.addBinding(GAME_PARAMS.cameraCoords, 'y', {format: value => number2MS(value, metricalIMS, 'm', 3), readonly: true})
+cameraSettingsFolder.addBinding(camera, 'scale', {format: value => value.toExponential()})
 
 if(sessionStorage['gameSettings'] !== undefined) pane.importState(JSON.parse(sessionStorage['gameSettings']))
 

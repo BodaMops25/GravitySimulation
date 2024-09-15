@@ -148,6 +148,8 @@ export function Camera({coords = new Vec(), scale = 1, particles, drawEngine, pa
   document.body.addEventListener("wheel", event => {
     if(event.deltaY > 0) this.scale /= 2
     else if(event.deltaY < 0) this.scale *= 2
+
+    if(this.pane) this.pane.refresh()
   })
 
   document.body.addEventListener("mousedown", event => {
