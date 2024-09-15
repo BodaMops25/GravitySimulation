@@ -94,7 +94,6 @@ particles.push(sun, earth, moon, mars, mercury, venus)
 
 // earth.impulse(new Vec(20e3, -5.233e3))
 venus.impulse(new Vec(-40e3, -25e3))
-camera.coords = earth.coords
 
 const fpsgraph = simulationSettingsFolder.addBlade({view: 'fpsgraph', label: 'FPS'})
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'tps', {min: 0, max: 1000, step: 1}).on('change', ({last, value}) => last ? (value === 0 ? clearInterval(loop) : setLoop(1000 / value)) : {})
@@ -137,9 +136,8 @@ cameraSettingsFolder.addBinding(GAME_PARAMS, 'focusBody', {options: {none: null,
   }
 })
 
-
-cameraSettingsFolder.addBinding(GAME_PARAMS, 'focusBodyVelocity', {view: 'graph', readonly: true, min: -1e5, max: 1e5})
-cameraSettingsFolder.addBinding(GAME_PARAMS, 'focusBodyVelocity', {readonly: true})
+cameraSettingsFolder.addBinding(GAME_PARAMS, 'focusBodyVelocity', {view: 'graph', readonly: true, min: 0, max: 1e5})
+cameraSettingsFolder.addBinding(GAME_PARAMS, 'focusBodyVelocity', {readonly: true, format: value => value.toFixed()})
 cameraSettingsFolder.addBinding(GAME_PARAMS.cameraCoords, 'x', {format: value => value.toExponential(), readonly: true})
 cameraSettingsFolder.addBinding(GAME_PARAMS.cameraCoords, 'y', {format: value => value.toExponential(), readonly: true})
 cameraSettingsFolder.addBinding(camera, 'scale', {format: value => value.toExponential(), readonly: true})
