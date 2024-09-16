@@ -74,15 +74,10 @@ export function Particle({coords = {x: 0, y: 0}, mass = 1, velocity = {x: 0, y: 
   this.orbitLine = []
 
   this.move = () => {
-    this.coords.set((coord, dim) => coord + this.velocity[dim] * this.options.simulationSpeed)
-
     this.coords.x += this.velocity.x * this.options.simulationSpeed
     this.coords.y += this.velocity.y * this.options.simulationSpeed
-
-    // if(this.orbitLine.length < 1000) this.orbitLine.push(this.coords.copy())
   }
 
-  // this.impulse = vec => this.velocity = this.velocity.add(vec)
   this.impulse = (x, y) => {
     if(x) this.velocity.x += x
     if(y) this.velocity.y += y
@@ -91,21 +86,25 @@ export function Particle({coords = {x: 0, y: 0}, mass = 1, velocity = {x: 0, y: 
 
 // ---- CAMERA ----
 
-export function Camera({coords = new Vec(), scale = 1, particles, drawEngine, pane, options} = {}) {
+export function Camera({coords = {x: 0, y: 0}, scale = 1, particles, drawEngine, pane, options} = {}) {
   this.coords = coords
   this.scale = scale
   this.particles = particles
   this.drawEngine = drawEngine
 
   this.mousemove = false
-  this.mouseDelta = new Vec()
-  this.anchoredCoords = new Vec()
+  this.mouseDelta = {x: 0, y: 0}
+  this.anchoredCoords = {x: 0, y: 0}
 
   this.pane = pane
   this.options = options
 
-  this.mapToCameraCoords = vec => {
-    return vec.copy().set((value, dim) => (value - this.coords[dim]) * this.scale + {x: this.drawEngine.cnvs.width, y: this.drawEngine.cnvs.height}[dim] / 2)
+  this.mapToCameraCoords = (x, y) => {
+    // return vec.copy().set((value, dim) => (value - this.coords[dim]) * this.scale + {x: this.drawEngine.cnvs.width, y: this.drawEngine.cnvs.height}[dim] / 2)
+    return {
+      x: (x - this.coords.x) * this.scale + this.drawEngine.cnvs.width / 2,
+      y: (y - this.coords.y) * this.scale + this.drawEngine.cnvs.height / 2
+    }
   }
 
   this.focus = vec => this.coords = vec.copy()
@@ -114,8 +113,11 @@ export function Camera({coords = new Vec(), scale = 1, particles, drawEngine, pa
 
     for(const particle of particles) {
 
-      const coords = this.mapToCameraCoords(particle.coords),
-            velocityCoords = this.mapToCameraCoords(new Vec().set((value, dim) => particle.coords[dim] + particle.velocity[dim] * this.options.simulationSpeed)),
+      const coords = this.mapToCameraCoords(particle.coords.x, particle.coords.y),
+            velocityCoords = {
+              x: particle.coords.x + particle.velocity.x * this.options.simulationSpeed,
+              y: particle.coords.y + particle.velocity.y * this.options.simulationSpeed
+            },
             scale = particle.radius * this.scale
 
       if(scale < 5) {

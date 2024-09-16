@@ -84,7 +84,7 @@ const sun = new Particle({
 
 particles.push(sun, earth, moon, mars, mercury, venus)
 
-for(let i = 0; i < 200; i++) particles.push(new Particle({
+for(let i = 0; i < 600; i++) particles.push(new Particle({
   coords: new Vec(GAME_PARAMS.AU / 10 + randomBetween(-4e9, 4e9), randomBetween(-4e9, 4e9)),
   color: 'purple',
   radius: 1e3,
@@ -158,12 +158,18 @@ function setLoop(ms) {
     for(const particle of particles) {
       for(const particle2 of particles) {
         if(particle === particle2) continue
+
+        const vec = {
+          x: particle2.coords.x - particle.coords.x,
+          y: particle2.coords.y - particle.coords.y
+        },
+              gravityForce = GAME_PARAMS.GRAVITY_CONST * particle.mass * particle2.mass / ((vec.x**2 + vec.y**2)**.5)**2,
+              velocity = {
+                x: Math.sin(Math.atan2(vec.x, vec.y)) * gravityForce / particle.mass * GAME_PARAMS.simulationSpeed,
+                y: Math.cos(Math.atan2(vec.x, vec.y)) * gravityForce / particle.mass * GAME_PARAMS.simulationSpeed
+              }
   
-        const vec = particle2.coords.subtract(particle.coords),
-              gravityForce = GAME_PARAMS.GRAVITY_CONST * particle.mass * particle2.mass / vec.module()**2,
-              velocity = new Vec().set((value, dim) => ({x: Math.sin, y: Math.cos})[dim](vec.angle()) * gravityForce / particle.mass * GAME_PARAMS.simulationSpeed)
-  
-        particle.impulse(velocity)
+        particle.impulse(velocity.x, velocity.y)
       }
     }
   
@@ -191,4 +197,4 @@ function setRenderLoop(ms) {
 
 
 setLoop(1000 / GAME_PARAMS.tps)
-// setRenderLoop(1000 / GAME_PARAMS.fps)
+setRenderLoop(1000 / GAME_PARAMS.fps)
