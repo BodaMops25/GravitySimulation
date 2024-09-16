@@ -5,7 +5,28 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Document</title>
-  <link rel="stylesheet" href="styles.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: #1e1e25;
+      overflow: hidden;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+    }
+
+    #pane-settings-container {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      width: 300px;
+    }
+  </style>
 </head>
 <body>
   
@@ -13,6 +34,86 @@
   
   <div id="pane-settings-container"></div>
 
-  <script type="module" src="index.js"></script>
+  <script type="module">
+
+    import {Pane} from './tweakpane-4.0.4.js'
+    import * as TweakpaneEssentials from './tweakpane-plugin-essentials-0.2.1.js'
+
+    function randomBetween(min, max) {
+      return min + Math.random()*(max-min)
+    }
+
+    const tps = 70,
+          GRAVITY_CONST = 6.7e-11,
+          AU = 150e9,
+          simulationSpeed = 3600 * 6,
+          particles = []
+
+    function Particle({pos = {x: 0, y: 0}, mass = 1, velocity = {x: 0, y: 0}, radius = 10, color = '#fff'} = {}) {
+      this.pos = pos
+      this.mass = mass
+      this.velocity = velocity
+      this.radius = radius
+      this.color = color
+
+      this.move = () => {
+
+        this.pos.x += this.velocity.x * simulationSpeed
+        this.pos.y += this.velocity.y * simulationSpeed
+      }
+
+      this.impulse = ({x, y}) => {
+        if(x) this.velocity.x += x
+        if(y) this.velocity.y += y
+      }
+    }
+
+    for(let i = 0; i < 706; i++) particles.push(new Particle({
+      pos: {x: AU / 10 + randomBetween(-4e9, 4e9), y: randomBetween(-4e9, 4e9)},
+      color: 'purple',
+      radius: 1e3,
+      velocity: {x: 0, y: 1e5},
+    }))
+
+    const pane = new Pane({title: 'Settings', container: document.querySelector('#pane-settings-container')})
+    pane.registerPlugin(TweakpaneEssentials)
+    const fpsgraph = pane.addBlade({view: 'fpsgraph', label: 'FPS'})
+
+    let start = +new Date()
+
+    setInterval(() => {
+      fpsgraph.begin()
+
+      for(const particle of particles) {
+        for(const particle2 of particles) {
+          if(particle === particle2) continue
+
+          const vec = {
+            x: particle2.pos.x - particle.pos.x,
+            y: particle2.pos.y - particle.pos.y
+          },
+                gravityForce = GRAVITY_CONST * particle.mass * particle2.mass / ((vec.x**2 + vec.y**2)**.5)**2,
+                velocity = {
+                  x: Math.sin(Math.atan2(vec.x, vec.y)) * gravityForce / particle.mass * simulationSpeed,
+                  y: Math.cos(Math.atan2(vec.x, vec.y)) * gravityForce / particle.mass * simulationSpeed
+                }
+    
+          // const vec = particle2.coords.subtract(particle.coords),
+          //       gravityForce = GAME_PARAMS.GRAVITY_CONST * particle.mass * particle2.mass / vec.module()**2,
+          //       velocity = new Vec().set((value, dim) => ({x: Math.sin, y: Math.cos})[dim](vec.angle()) * gravityForce / particle.mass * GAME_PARAMS.simulationSpeed)
+    
+          particle.impulse(velocity.x, velocity.y)
+        }
+      }
+    
+      for(const particle of particles) particle.move(particles)
+
+      fpsgraph.end()
+      // const ms = new Date() - start
+      // if(ms !== 0) console.log(Math.round(1000 / ms))
+      // start = +new Date()
+    }, 1000 / tps)
+
+  </script>
 </body>
 </html>
