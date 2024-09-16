@@ -95,7 +95,7 @@ for(let i = 0; i < 200; i++) particles.push(new Particle({
 // earth.impulse(new Vec(20e3, -5.233e3))
 venus.impulse(new Vec(-40e3, -25e3))
 
-const fpsgraph = simulationSettingsFolder.addBlade({view: 'fpsgraph', label: 'FPS'})
+const tpsgraph = simulationSettingsFolder.addBlade({view: 'fpsgraph', label: 'TPS'})
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'tps', {min: 0, max: 1000, step: 1}).on('change', ({last, value}) => last ? (value === 0 ? clearInterval(loop) : setLoop(1000 / value)) : {})
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'fps', {min: 0, max: 1000, step: 1}).on('change', ({last, value}) => last ? (value === 0 ? clearInterval(renderLoop) : setRenderLoop(1000 / value)) : {})
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'simulationSpeed', {step: 1})
@@ -153,6 +153,7 @@ function setLoop(ms) {
   if(ms === Infinity) return
 
   loop = setInterval(() => {
+    tpsgraph.begin()
 
     for(const particle of particles) {
       for(const particle2 of particles) {
@@ -167,6 +168,7 @@ function setLoop(ms) {
     }
   
     for(const particle of particles) particle.move(particles)
+      tpsgraph.end()
   }, ms)
 }
 
@@ -176,7 +178,6 @@ function setRenderLoop(ms) {
 
   renderLoop = setInterval(() => {
     window.requestAnimationFrame(() => {
-      fpsgraph.begin()
 
       camera.drawEngine.clear()
       camera.render()
@@ -184,7 +185,6 @@ function setRenderLoop(ms) {
 
       if(GAME_PARAMS.focusBodyObj !== null) GAME_PARAMS.focusBodyVelocity = GAME_PARAMS.focusBodyObj.velocity.module()
 
-      fpsgraph.end()
     })
   }, ms)
 }
