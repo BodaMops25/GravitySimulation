@@ -1,5 +1,3 @@
-import {Vec} from './helpers.js'
-
 // ---- CANVAS ----
 
 export function DrawEngine(canvas) {
@@ -8,36 +6,40 @@ export function DrawEngine(canvas) {
 
   this.clear = () => this.ctx.clearRect(0, 0, this.cnvs.width, this.cnvs.height)
 
-  this.drawBall = (vec = new Vec(10, 10), scale = 10, color = '#fff') => {
+  this.drawBall = (x = 10, y = 10, scale = 10, color = '#fff') => {
     this.ctx.beginPath()
     this.ctx.fillStyle = color
-    this.ctx.arc(vec.x, vec.y, scale, 0, Math.PI*2)
+    this.ctx.arc(x, y, scale, 0, Math.PI*2)
     this.ctx.fill()
   }
 
-  this.drawCircle = (vec = new Vec(10, 10), scale = 10, thickness = 2, color = '#fff') => {
+  this.drawCircle = (x = 10, y = 10, scale = 10, thickness = 2, color = '#fff') => {
     this.ctx.beginPath()
     this.ctx.strokeStyle = color
     this.ctx.lineWidth = thickness
-    this.ctx.arc(vec.x, vec.y, scale, 0, Math.PI*2)
+    this.ctx.arc(x, y, scale, 0, Math.PI*2)
     this.ctx.stroke()
   }
   
-  this.drawVector = (vec1 = new Vec(), vec2 = new Vec(50, 50), scale = 10, color = '#fff', mode = 0) => {
+  this.drawVector = (x = 0, y = 0, x2 = 50, y2 = 50, scale = 10, color = '#fff', mode = 0) => {
     this.ctx.beginPath()
     this.ctx.fillStyle = color
     this.ctx.strokeStyle = color
     this.ctx.lineWidth = scale
-    this.ctx.moveTo(vec1.x, vec1.y)
+    this.ctx.moveTo(x, y)
   
-    let vec_end = vec2
+    let end_x = x2,
+        end_y = y2
   
-    if(mode === 1) vec_end = vec1.add(vec2)
+    if(mode === 1) {
+      end_x = x + x2
+      end_y = y + y2
+    }
   
-    this.ctx.lineTo(vec_end.x, vec_end.y)
+    this.ctx.lineTo(end_x, end_y)
     this.ctx.stroke()
     this.ctx.beginPath()
-    this.drawBall(vec_end, scale * 1.2, color)
+    this.drawBall(end_x, end_y, scale * 1.2, color)
   }
   
   this.drawCursor = () => {
@@ -62,7 +64,7 @@ export function DrawEngine(canvas) {
 
 // ---- PARTICLES ----
 
-export function Particle({coords = new Vec(), mass = 1, velocity = new Vec(), radius = 10, color = '#fff', options} = {}) {
+export function Particle({coords = {x: 0, y: 0}, mass = 1, velocity = {x: 0, y: 0}, radius = 10, color = '#fff', options} = {}) {
   this.coords = coords
   this.mass = mass
   this.velocity = velocity
@@ -74,52 +76,71 @@ export function Particle({coords = new Vec(), mass = 1, velocity = new Vec(), ra
   this.orbitLine = []
 
   this.move = () => {
-    this.coords.set((coord, dim) => coord + this.velocity[dim] * this.options.simulationSpeed)
-
-    // if(this.orbitLine.length < 1000) this.orbitLine.push(this.coords.copy())
+    this.coords.x += this.velocity.x * this.options.simulationSpeed
+    this.coords.y += this.velocity.y * this.options.simulationSpeed
   }
 
-  this.impulse = vec => this.velocity = this.velocity.add(vec)
+  this.impulse = (x, y) => {
+    if(x) this.velocity.x += x
+    if(y) this.velocity.y += y
+  }
 }
 
 // ---- CAMERA ----
 
-export function Camera({coords = new Vec(), scale = 1, particles, drawEngine, pane, options} = {}) {
+export function Camera({coords = {x: 0, y: 0}, scale = 1, particles, drawEngine, pane, options} = {}) {
   this.coords = coords
   this.scale = scale
   this.particles = particles
   this.drawEngine = drawEngine
 
   this.mousemove = false
-  this.mouseDelta = new Vec()
-  this.anchoredCoords = new Vec()
+  this.mouseDelta = {x: 0, y: 0}
+  this.anchoredCoords = {x: 0, y: 0}
+
+  this.focusBody = null
 
   this.pane = pane
   this.options = options
 
-  this.mapToCameraCoords = vec => {
-    return vec.copy().set((value, dim) => (value - this.coords[dim]) * this.scale + {x: this.drawEngine.cnvs.width, y: this.drawEngine.cnvs.height}[dim] / 2)
+  this.mapToCameraCoords = (x, y) => {
+    return {
+      x: (x - this.coords.x) * this.scale + this.drawEngine.cnvs.width / 2,
+      y: (y - this.coords.y) * this.scale + this.drawEngine.cnvs.height / 2
+    }
   }
 
-  this.focus = vec => this.coords = vec.copy()
+  this.focus = (x, y) => {
+    if(x === null) this.focusBody = null
+    else if(x.constructor === Particle) this.focusBody = x
+    else {
+      if(x) this.coords.x = x
+      if(y) this.coords.y = y
+    }
+  }
 
   this.render = () => {
 
+    if(this.focusBody) {
+      this.coords.x = this.focusBody.coords.x
+      this.coords.y = this.focusBody.coords.y
+    }
+
     for(const particle of particles) {
 
-      const coords = this.mapToCameraCoords(particle.coords),
-            velocityCoords = this.mapToCameraCoords(new Vec().set((value, dim) => particle.coords[dim] + particle.velocity[dim] * this.options.simulationSpeed)),
+      const coords = this.mapToCameraCoords(particle.coords.x, particle.coords.y),
+            velocityCoords = this.mapToCameraCoords(particle.coords.x + particle.velocity.x * this.options.simulationSpeed, particle.coords.y + particle.velocity.y * this.options.simulationSpeed),
             scale = particle.radius * this.scale
 
       if(scale < 5) {
-        this.drawEngine.drawBall(coords, 5, particle.color)
-        this.drawEngine.drawCircle(coords, 7, 1, 'white')
+        this.drawEngine.drawBall(coords.x, coords.y, 5, particle.color)
+        this.drawEngine.drawCircle(coords.x, coords.y, 7, 1, 'white')
       }
       else {
-        this.drawEngine.drawBall(coords, scale, particle.color)
+        this.drawEngine.drawBall(coords.x, coords.y, scale, particle.color)
       }
 
-      this.drawEngine.drawVector(coords, velocityCoords, 2, '#fff', 0)
+      this.drawEngine.drawVector(coords.x, coords.y, velocityCoords.x, velocityCoords.y, 2, '#fff', 0)
 
       if(this.pane) {
         this.options.cameraCoords.x = this.coords.x
@@ -155,8 +176,11 @@ export function Camera({coords = new Vec(), scale = 1, particles, drawEngine, pa
   document.body.addEventListener("mousedown", event => {
     if(event.buttons === 1 && event.shiftKey) this.mousemove = true
 
-    this.mouseDelta.set(event.offsetX, event.offsetY)
-    this.anchoredCoords = this.coords.copy()
+    this.mouseDelta.x = event.offsetX
+    this.mouseDelta.y = event.offsetY
+
+    this.anchoredCoords.x = this.coords.x
+    this.anchoredCoords.y = this.coords.y
   })
 
   document.body.addEventListener("mouseup", event => {
@@ -167,8 +191,11 @@ export function Camera({coords = new Vec(), scale = 1, particles, drawEngine, pa
   document.body.addEventListener("mousemove", event => {
     if(this.mousemove === true && event.shiftKey) {
 
-      const delta = new Vec(event.offsetX, event.offsetY).subtract(this.mouseDelta)
-      this.coords = this.anchoredCoords.subtract(delta.divide(this.scale))
+      const delta_x = event.offsetX - this.mouseDelta.x,
+            delta_y = event.offsetY - this.mouseDelta.y
+
+      this.coords.x = this.anchoredCoords.x - delta_x / this.scale
+      this.coords.y = this.anchoredCoords.y - delta_y / this.scale
     }
   })
 }
