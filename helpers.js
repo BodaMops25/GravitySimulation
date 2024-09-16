@@ -21,6 +21,10 @@ export const metricalIMS = [
 
 // ---- MATH ----
 
+export function randomBetween(min, max) {
+  return min + Math.random()*(max-min)
+}
+
 export function Vec(x = 0, y = 0) {
   this.x = x
   this.y = y

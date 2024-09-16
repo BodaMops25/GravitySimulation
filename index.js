@@ -1,4 +1,4 @@
-import {Vec, GAME_PARAMS, number2MS, metricalIMS} from './helpers.js'
+import {Vec, GAME_PARAMS, number2MS, metricalIMS, randomBetween} from './helpers.js'
 import {DrawEngine, Particle, Camera} from './game.js'
 import {Pane} from './tweakpane-4.0.4.js'
 import * as TweakpaneEssentials from './tweakpane-plugin-essentials-0.2.1.js'
@@ -84,15 +84,13 @@ const sun = new Particle({
 
 particles.push(sun, earth, moon, mars, mercury, venus)
 
-for(let i = 0; i < 1; i++) particles.push(new Particle({
-  coords: new Vec(GAME_PARAMS.AU / 10, 0),
+for(let i = 0; i < 200; i++) particles.push(new Particle({
+  coords: new Vec(GAME_PARAMS.AU / 10 + randomBetween(-4e9, 4e9), randomBetween(-4e9, 4e9)),
   color: 'purple',
   radius: 1e3,
   velocity: new Vec(0, 1e5),
   options: GAME_PARAMS
 }))
-
-console.log(particles)
 
 // earth.impulse(new Vec(20e3, -5.233e3))
 venus.impulse(new Vec(-40e3, -25e3))
@@ -148,6 +146,8 @@ if(sessionStorage['gameSettings'] !== undefined) pane.importState(JSON.parse(ses
 
 // LOOP
 
+let start = +new Date
+
 function setLoop(ms) {
   if(loop !== undefined) clearInterval(loop)
   if(ms === Infinity) return
@@ -167,7 +167,6 @@ function setLoop(ms) {
     }
   
     for(const particle of particles) particle.move(particles)
-  
   }, ms)
 }
 
