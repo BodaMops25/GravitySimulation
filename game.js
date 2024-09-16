@@ -62,7 +62,7 @@ export function DrawEngine(canvas) {
 
 // ---- PARTICLES ----
 
-export function Particle({coords = new Vec(), mass = 1, velocity = new Vec(), radius = 10, color = '#fff', options} = {}) {
+export function Particle({coords = {x: 0, y: 0}, mass = 1, velocity = {x: 0, y: 0}, radius = 10, color = '#fff', options} = {}) {
   this.coords = coords
   this.mass = mass
   this.velocity = velocity
@@ -76,10 +76,17 @@ export function Particle({coords = new Vec(), mass = 1, velocity = new Vec(), ra
   this.move = () => {
     this.coords.set((coord, dim) => coord + this.velocity[dim] * this.options.simulationSpeed)
 
+    this.coords.x += this.velocity.x * this.options.simulationSpeed
+    this.coords.y += this.velocity.y * this.options.simulationSpeed
+
     // if(this.orbitLine.length < 1000) this.orbitLine.push(this.coords.copy())
   }
 
-  this.impulse = vec => this.velocity = this.velocity.add(vec)
+  // this.impulse = vec => this.velocity = this.velocity.add(vec)
+  this.impulse = (x, y) => {
+    if(x) this.velocity.x += x
+    if(y) this.velocity.y += y
+  }
 }
 
 // ---- CAMERA ----

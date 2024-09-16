@@ -191,4 +191,4 @@ function setRenderLoop(ms) {
 
 
 setLoop(1000 / GAME_PARAMS.tps)
-setRenderLoop(1000 / GAME_PARAMS.fps)
+// setRenderLoop(1000 / GAME_PARAMS.fps)
