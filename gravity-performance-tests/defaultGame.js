@@ -9,7 +9,6 @@ function distance(x2, y2, x, y) {
   return ((x2 - x)**2 + (y2 - y)**2)**.5
 }
 
-
 function Particle({pos = {x: 0, y: 0}, mass = 1, velocity = {x: 0, y: 0}, radius = 10, color = '#fff'} = {}) {
   this.pos = pos
   this.mass = mass
@@ -22,7 +21,7 @@ function Particle({pos = {x: 0, y: 0}, mass = 1, velocity = {x: 0, y: 0}, radius
     this.pos.y += this.velocity.y / this.mass * GAME_PARAMS.simulation_speed
   }
 
-  this.impulse = (pos) => {
+  this.impulse = pos => {
     this.velocity.x += pos.x
     this.velocity.y += pos.y
   }
