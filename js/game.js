@@ -1,4 +1,4 @@
-import { distance, GAME_PARAMS } from "./helpers"
+import { distance, GAME_PARAMS } from "./helpers.js"
 
 export function gravityForce(particle, particles) {
   particles.forEach(particle2 => {

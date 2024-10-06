@@ -1,3 +1,5 @@
+import { GAME_PARAMS } from "./helpers.js"
+
 export function Camera({particles, pos = {x: 0, y: 0}, scale = 1, focusedBody, canvasHelper}) {
   this.pos = pos
   this.scale = scale
@@ -31,19 +33,20 @@ export function Camera({particles, pos = {x: 0, y: 0}, scale = 1, focusedBody, c
   }
 
 
-  this.render = () => {
+  this.render = ({debug} = {}) => {
 
     for(const particle of particles) {
 
-      const {x, y} = this.map2CameraPos(particle.pos),
-            {force_x, force_y} = this.map2CameraPos({
-              x: particle.pos.x + particle.velocity.x / particle.mass,
-              y: particle.pos.y + particle.velocity.y / particle.mass
+      const pos = this.map2CameraPos(particle.pos),
+            velocity = this.map2CameraPos({
+              x: particle.pos.x + particle.velocity.x * GAME_PARAMS.simulation_speed,
+              y: particle.pos.y + particle.velocity.y * GAME_PARAMS.simulation_speed
             }),
             scale = particle.radius * this.scale
 
-      this.canvasHelper.drawBall(x, y, scale < 5 ? 5 : scale, particle.color)
-      this.canvasHelper.drawVector(x, y, force_x, force_y, 2, '#fff', 0)
+      this.canvasHelper.drawBall(pos, scale < 5 ? 5 : scale, particle.color)
+
+      if(debug) this.canvasHelper.drawVector(pos, velocity, 2, '#000')
     }
 
   }
@@ -61,8 +64,8 @@ export function Camera({particles, pos = {x: 0, y: 0}, scale = 1, focusedBody, c
     this.mouseDelta.x = event.offsetX
     this.mouseDelta.y = event.offsetY
 
-    this.anchored.x = this.x
-    this.anchored.y = this.y
+    this.anchored.x = this.pos.x
+    this.anchored.y = this.pos.y
   })
 
   document.body.addEventListener("mouseup", event => {
