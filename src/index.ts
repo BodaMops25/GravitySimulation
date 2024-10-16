@@ -1,15 +1,17 @@
-import { CanvasHelper, GAME_PARAMS, randomBetween } from "./helpers.js"
-import { Particle } from "./particles.js"
-import { Camera } from "./camera.js"
-import { gravityForce } from "./game.js"
+import { CanvasHelper, GAME_PARAMS, randomBetween } from "./helpers"
+import { Particle } from "./particles"
+import { Camera } from "./camera"
+import { gravityForce } from "./game"
 
-const canvas = document.querySelector("#main-frame"),
-      canvasHelper = new CanvasHelper(canvas)
+const canvas = document.querySelector<HTMLCanvasElement>("#main-frame")
+if(!canvas) throw new Error('No canvas!')
+
+const canvasHelper = new CanvasHelper(canvas)
 
 canvas.width = innerWidth
 canvas.height = innerHeight
 
-const particles = [],
+const particles: Particle[] = [],
       camera = new Camera({particles, canvasHelper})
 
 camera.scale = +sessionStorage['camera_scale'] || 1
@@ -24,7 +26,7 @@ for(let i = 0; i < 500; i++) particles.push(new Particle({
 
 let start = +new Date()
 const loop = setInterval(() => {
-  canvasHelper.ctx.clearRect(0, 0, canvas.width, canvas.height)
+  canvasHelper.ctx?.clearRect(0, 0, canvas.width, canvas.height)
 
   for(const particle of particles) gravityForce(particle, particles)
   for(const particle of particles) particle.move()
@@ -32,7 +34,7 @@ const loop = setInterval(() => {
   camera.render({debug: true})
   camera.canvasHelper.drawCursor()
 
-  console.log(new Date() - start, 'ms')
+  console.log(+new Date() - start, 'ms')
   start = +new Date()
 
 }, 1000 / GAME_PARAMS.tick_speed)

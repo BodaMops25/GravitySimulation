@@ -5,26 +5,41 @@ export const GAME_PARAMS = {
   tick_speed: 65 || 120
 }
 
-export function randomBetween(min, max) {
+export function randomBetween(min: number, max: number) {
   return (max - min) * Math.random() + min
 }
 
-export function distance(pos2, pos) {
+export function distance(pos2: Vec, pos: Vec) {
   return ((pos2.x - pos.x)**2 + (pos2.y - pos.y)**2)**.5
 }
 
-export function CanvasHelper(canvas) {
-  this.canvas = canvas
-  this.ctx = canvas.getContext('2d')
+export class CanvasHelper {
+  canvas: HTMLCanvasElement
+  ctx: CanvasRenderingContext2D | null
 
-  this.drawBall = ({x = 0, y = 0} = {}, scale = 50, color = '#fff') => {
+  constructor(canvas: HTMLCanvasElement) {
+    this.canvas = canvas
+    this.ctx = canvas.getContext('2d')
+  }
+
+  drawBall = ({x, y}: Vec, scale: number = 50, color: string = '#fff') => {
+    if(!this.ctx) {
+      console.warn('No canvas context2D!')
+      return
+    }
+
     this.ctx.beginPath()
     this.ctx.fillStyle = color
     this.ctx.arc(x, y, scale, 0, Math.PI*2)
     this.ctx.fill()
   }
   
-  this.drawVector = ({x = 0, y = 0} = {}, {x: to_x = 50, y: to_y = 50} = {}, scale = 10, color = '#fff', mode = 'absolute') => {
+  drawVector = ({x, y}: Vec, {x: to_x, y: to_y}: Vec, scale = 10, color = '#fff', mode?: 'relative') => {
+    if(!this.ctx) {
+      console.warn('No canvas context2D!')
+      return
+    }
+
     this.ctx.beginPath()
     this.ctx.fillStyle = color
     this.ctx.strokeStyle = color
@@ -47,7 +62,12 @@ export function CanvasHelper(canvas) {
     this.drawBall(to, scale * 1.5, color)
   }
   
-  this.drawCursor = () => {
+  drawCursor = () => {
+    if(!this.ctx) {
+      console.warn('No canvas context2D!')
+      return
+    }
+
     const hh = this.canvas.width / 2,
           vh = this.canvas.height / 2,
           radius = 5
@@ -66,3 +86,8 @@ export function CanvasHelper(canvas) {
     this.ctx.stroke()
   }
 }
+
+export type Vec = {
+  x: number,
+  y: number
+} 
