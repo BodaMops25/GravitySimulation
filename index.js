@@ -60,6 +60,7 @@ function foo(root, point, {min_x, min_y, max_x, max_y}) {
   root.mass = 0
   root.x = 0
   root.y = 0
+  root.scale = max_x - min_x
 
   for(const sectorKey in root) {
     const sector = root[sectorKey]
