@@ -1,0 +1,16 @@
+{
+  "name": "temp",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "build": "esbuild index.js --bundle --outfile=bundle.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  }
+}
