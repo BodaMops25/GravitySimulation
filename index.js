@@ -130,7 +130,3 @@ const coords = getAreaCorners(points)
 for(const point of points) {
   foo(root, point, coords)
 }
-
-console.log(root)
-
-bodyForce(points[0], root)
