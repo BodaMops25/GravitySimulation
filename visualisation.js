@@ -29,24 +29,42 @@ export function createGrid(x, y, width, height, options) {
     c.stroke()
 }
 
-export function visualizeParticlesTreeInArea(particlesTree, options, sectorKey) {
-    const points = []
+export function visualizeParticlesTreeInArea(particlesTree, options, initalScale) {
+    if(initalScale === undefined) initalScale = particlesTree.data.scale
+    if(options.offsetX === undefined) options.offsetX = 0
+    if(options.offsetY === undefined) options.offsetY = 0
 
-    for(const sectorKey of particlesTree.sectors) {
+    const points = [],
+        gridWidth = particlesTree.data.scale * options.width,
+        gridHeight = particlesTree.data.scale * options.height
+
+    for(const sectorKey in particlesTree.sectors) {
         const sector = particlesTree.sectors[sectorKey]
 
+        let offsetX = 0,
+            offsetY = 0
+
+        if(sectorKey?.includes('e')) offsetX = particlesTree.data.scale / 2
+        if(sectorKey?.includes('s')) offsetY = particlesTree.data.scale / 2
+
         if(sector.label !== undefined) points.push({
-            x: sector.x,
-            y: sector.y,
-            color: 'orange',
-            radius: 5
+            x: (sector.x - options.offsetX) / particlesTree.data.scale * gridWidth,
+            y: (sector.y - options.offsetY) / particlesTree.data.scale * gridHeight,
+            color: sector.color !== undefined ? sector.color : options.pointColor,
+            radius: sector.radius !== undefined ? sector.radius : options.pointRadius,
+            label: sector.label
         })
+        if(sector.sectors !== undefined) {
+
+            visualizeParticlesTreeInArea(sector, {
+                ...options,
+                offsetX: options.offsetX + offsetX,
+                offsetY: options.offsetY + offsetY
+            }, initalScale)
+        }
     }
 
-    let offsetX = 0,
-        offsetY = 0
-
-    createGrid(options.x + offsetX, options.y + offsetY, particlesTree.data.scale, particlesTree.data.scale, {
+    createGrid(options.x + options.width * options.offsetX, options.y + options.height * options.offsetY, gridWidth, gridHeight, {
         ctx: options.ctx,
         lineWidth: options.lineWidth,
         strokeStyle: options.strokeStyle,

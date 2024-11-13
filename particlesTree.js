@@ -54,7 +54,7 @@ export function createParticlesTree(root, point, {min_x, min_y, max_x, max_y}) {
   }
 
   const {sectors, data: rootData} = root
-  debugger
+  
   if(sectors[sector] === undefined) {
     sectors[sector] = point
   }
