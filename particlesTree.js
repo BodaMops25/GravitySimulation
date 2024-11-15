@@ -1,4 +1,21 @@
-function cartesianDistance(x1, y1, x2, y2) {
+export function randomBetween(max=1, min=0, precision=-1) {
+  const num = min + Math.random() * (max-min)
+
+  if(precision === -1) return num
+  return +num.toFixed(precision)
+}
+
+export function randomId(length) {
+  let id = ''
+  for(let i = 0; i < length; i++) id += String.fromCharCode(randomBetween(65, 123, 0))
+  return id
+}
+
+export function randomArrayItem(arr) {
+  return arr[Math.floor(Math.random() * arr.length)]
+}
+
+export function cartesianDistance(x1, y1, x2, y2) {
   const d1 = (x1**2 + y1**2)**.5,
         d2 = (x2**2 + y2**2)**.5
 
@@ -19,13 +36,19 @@ export function getAreaCorners(points) {
   return {min_x, min_y, max_x, max_y}
 }
 
-export function createParticlesTree(root, point, {min_x, min_y, max_x, max_y}) {
+function setToBarnesHutTree(root, point, {min_x, min_y, max_x, max_y}, depth=1) {
+  if(depth>1000) {
+    console.warn("Too much recursions!")
+    return
+  }
+
   if(root.sectors === undefined) {
     root.sectors = {}
   }
   if(root.data === undefined) {
     root.data = {
-      scale: max_x - min_x
+      scale: max_x - min_x,
+      id: randomId(4)
     }
   }
 
@@ -58,14 +81,19 @@ export function createParticlesTree(root, point, {min_x, min_y, max_x, max_y}) {
   if(sectors[sector] === undefined) {
     sectors[sector] = point
   }
-  else if(sectors[sector].label !== undefined) {
+  else if(sectors[sector] !== undefined && sectors[sector].sectors === undefined) {
+    if(sectors[sector].x === point.x && sectors[sector].y === point.y) {
+      console.warn('Trying put couple of points to the same position!')
+      return
+    }
+
     const point_tmp = sectors[sector]
     sectors[sector] = {}
 
-    createParticlesTree(sectors[sector], point_tmp, new_coords)
-    createParticlesTree(sectors[sector], point, new_coords)
+    setToBarnesHutTree(sectors[sector], point_tmp, new_coords, depth+1)
+    setToBarnesHutTree(sectors[sector], point, new_coords, depth+1)
   }
-  else if(sectors[sector].label === undefined) createParticlesTree(sectors[sector], point, new_coords)
+  else if(sectors[sector].sectors !== undefined) setToBarnesHutTree(sectors[sector], point, new_coords, depth+1)
   
   rootData.mass = 0
   rootData.x = 0
@@ -86,23 +114,43 @@ export function createParticlesTree(root, point, {min_x, min_y, max_x, max_y}) {
   rootData.y /= rootData.mass
 }
 
-export function bodyForce(body, bodiesTree, threshold) {
+export function createBarnesHutTree(points) {
+  const root = {},
+        pointsCorners = getAreaCorners(points)
+
+  for(const point of points) {
+    setToBarnesHutTree(root, point, pointsCorners)
+  }
+
+  return root
+}
+
+export function simplifyBodiesForTarget(target, bodiesTree, threshold) {
+
+  const array = []
 
   for(const sectorKey in bodiesTree.sectors) {
     const sector = bodiesTree.sectors[sectorKey]
 
-    if(body === sector) continue
+    if(target === sector) continue
 
-    if(sector.label !== undefined) {
-      console.log('from point', sector, 'to', body)
-      return
+    if(sector !== undefined && sector.sectors === undefined) {
+      array.push(sector)
+      // console.log('from point', sector, 'to', target)
+      continue
     }
     
-    const dist = cartesianDistance(body.x, body.y, sector.data.x, sector.data.y),
+    const dist = Math.abs(cartesianDistance(target.x, target.y, sector.data.x, sector.data.y)),
         k = sector.data.scale / dist
 
-      if(k > threshold) console.log('from sectors', sector, 'to', body)
-
-      bodyForce(body, sector)
+      if(k < threshold) {
+        // console.log('from sectors', sector, 'to', target)
+        array.push(sector)
+      }
+      else {
+        array.push(...simplifyBodiesForTarget(target, sector, threshold))
+      }
   }
+
+  return array
 }
