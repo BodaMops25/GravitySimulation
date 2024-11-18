@@ -1,4 +1,4 @@
-import { distance, randomId, Vec } from "./src/helpers"
+import { distance, randomId, Vec } from "./helpers"
 
 export function getAreaCorners(points: Point[]) {
   const min: Vec = {...points[0].pos},
@@ -42,7 +42,7 @@ function setToBarnesHutTree(root: BarnesHutRootType, point: Point, {min, max}: {
   }
 
   let sector = '',
-      newCoords = {min, max}
+      newCoords = {min: {...min}, max: {...max}}
 
   if(point.pos.y < middleCoords.y) {
     sector += 'n'
@@ -152,7 +152,7 @@ export function simplifyBodiesForTarget(target: Point | BarnesHutRootType, bodie
 
     const sector = sectorOrPoint as BarnesHutRootType
 
-    const dist = Math.abs(distance(target.data.pos, sector.data.pos)),
+    const dist = Math.abs(distance((target as Point).pos || (target as BarnesHutRootType).data.pos, sector.data.pos)),
         k = sector.data.scale / dist
 
       if(k < threshold) {
