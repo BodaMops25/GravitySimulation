@@ -9,6 +9,12 @@ export function randomBetween(min: number, max: number) {
   return (max - min) * Math.random() + min
 }
 
+export function randomId(length: number) {
+  let id = ''
+  for(let i = 0; i < length; i++) id += String.fromCharCode(Math.round(randomBetween(65, 123)))
+  return id
+}
+
 export function distance(pos2: Vec, pos: Vec) {
   return ((pos2.x - pos.x)**2 + (pos2.y - pos.y)**2)**.5
 }
