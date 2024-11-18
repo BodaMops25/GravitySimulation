@@ -2,7 +2,8 @@ import { CanvasHelper, GAME_PARAMS, randomBetween } from "./helpers"
 import { Particle } from "./particles"
 import { Camera } from "./camera"
 import { gravityForce } from "./game"
-import { createBarnesHutTree } from "../barnes-hun"
+import { createBarnesHutTree, getAreaCorners } from "../barnes-hun"
+import { visualizeParticlesTreeInArea } from "./visualisation"
 
 const canvas = document.querySelector<HTMLCanvasElement>("#main-frame")
 if(!canvas) throw new Error('No canvas!')
@@ -25,18 +26,18 @@ camera.pos = JSON.parse(sessionStorage['camera_pos'] || '{"x": 0, "y": 0}')
 //   mass: 1e12
 // }))
 
-for(const letter of ['A', 'B', 'C', 'D']) {
+for(let i = 0; i < 10; i++) {
   particles.push(new Particle({
     pos: {x: randomBetween(-10, 10), y: randomBetween(-10, 10)},
     radius: 1,
-    mass: 1,
-    label: letter
+    mass: 1
   }))
 }
 
 console.log(particles)
 camera.render({debug: true})
 
+const area = getAreaCorners(particles)
 const BHRoot = createBarnesHutTree(particles)
 console.log(BHRoot)
 
