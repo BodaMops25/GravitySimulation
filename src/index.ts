@@ -3,7 +3,6 @@ import { Particle } from "./particles"
 import { Camera } from "./camera"
 import { gravityForceAll } from "./game"
 import { createBarnesHutTree, getAreaCorners, simplifyBodiesForTarget } from "./barnes-hun"
-import { drawGrid, visualizeParticlesTreeInArea } from "./visualisation"
 
 const canvas = document.querySelector<HTMLCanvasElement>("#main-frame")
 if(!canvas) throw new Error('No canvas!')
@@ -19,34 +18,12 @@ const particles: Particle[] = [],
 camera.scale = +sessionStorage['camera_scale'] || 1
 camera.pos = JSON.parse(sessionStorage['camera_pos'] || '{"x": 0, "y": 0}')
 
-for(let i = 0; i < 700; i++) particles.push(new Particle({
+for(let i = 0; i < 1000; i++) particles.push(new Particle({
   pos: {x: randomBetween(-GAME_PARAMS.AU, GAME_PARAMS.AU), y: randomBetween(-GAME_PARAMS.AU, GAME_PARAMS.AU)},
   velocity: {x: randomBetween(-1e3, 1e3), y: randomBetween(-1e3, 1e3)},
   radius: 1e3,
   mass: 1e12
 }))
-
-/* for(let i = 0; i < 50; i++) particles.push(new Particle({
-  pos: {x: +randomBetween(-1e3, 1e3).toFixed(0), y: +randomBetween(-1e3, 1e3).toFixed(0)},
-  velocity: {x: randomBetween(-1, 1), y: randomBetween(-1, 1)},
-  radius: 1,
-  mass: 1
-})) */
-
-/* particles.push(
-  new Particle({
-    pos: {x: 0, y: 0},
-    // velocity: {x: randomBetween(-10, 10), y: randomBetween(-10, 10)},
-    radius: .1,
-    mass: 1
-  }),
-  new Particle({
-    pos: {x: 10, y: 10},
-    // velocity: {x: randomBetween(-10, 10), y: randomBetween(-10, 10)},
-    radius: .1,
-    mass: 1
-  })
-) */
 
 camera.render({debug: true})
 
@@ -61,12 +38,9 @@ const loop = setInterval(() => {
     const gravityPoints = simplifyBodiesForTarget(particle, BHRoot, 1e3).map(item => item.sectors ? item.data : item)
     gravityForceAll(particle, gravityPoints)
   }
-
-  // for(const particle of particles) gravityForceAll(particle, particles)
   for(const particle of particles) particle.move()
 
   camera.render({debug: true})
-
   camera.canvasHelper.drawCursor()
 
   // console.log(+new Date() - start, 'ms')
