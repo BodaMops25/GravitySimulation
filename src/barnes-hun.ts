@@ -112,9 +112,10 @@ function setToBarnesHutTree(root: BarnesHutRootType, point: Point, {min, max}: {
   rootData.pos.y /= rootData.mass
 }
 
-export function createBarnesHutTree(points: Point[]) {
-  const pointsCorners = getAreaCorners(points),
-        root: BarnesHutRootType = {
+export function createBarnesHutTree(points: Point[], pointsCorners?: {min: Vec, max: Vec}) {
+  if(!pointsCorners) pointsCorners = getAreaCorners(points)
+
+  const root: BarnesHutRootType = {
     sectors: {},
     data: {
       id: randomId(4),

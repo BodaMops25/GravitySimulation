@@ -2,7 +2,8 @@ import { CanvasHelper, GAME_PARAMS, randomBetween } from "./helpers"
 import { Particle } from "./particles"
 import { Camera } from "./camera"
 import { gravityForceAll } from "./game"
-import { createBarnesHutTree, simplifyBodiesForTarget } from "./barnes-hun"
+import { createBarnesHutTree, getAreaCorners, simplifyBodiesForTarget } from "./barnes-hun"
+import { drawGrid, visualizeParticlesTreeInArea } from "./visualisation"
 
 const canvas = document.querySelector<HTMLCanvasElement>("#main-frame")
 if(!canvas) throw new Error('No canvas!')
@@ -25,13 +26,36 @@ for(let i = 0; i < 700; i++) particles.push(new Particle({
   mass: 1e12
 }))
 
+/* for(let i = 0; i < 50; i++) particles.push(new Particle({
+  pos: {x: +randomBetween(-1e3, 1e3).toFixed(0), y: +randomBetween(-1e3, 1e3).toFixed(0)},
+  velocity: {x: randomBetween(-1, 1), y: randomBetween(-1, 1)},
+  radius: 1,
+  mass: 1
+})) */
+
+/* particles.push(
+  new Particle({
+    pos: {x: 0, y: 0},
+    // velocity: {x: randomBetween(-10, 10), y: randomBetween(-10, 10)},
+    radius: .1,
+    mass: 1
+  }),
+  new Particle({
+    pos: {x: 10, y: 10},
+    // velocity: {x: randomBetween(-10, 10), y: randomBetween(-10, 10)},
+    radius: .1,
+    mass: 1
+  })
+) */
+
 camera.render({debug: true})
 
 // let start = +new Date()
 const loop = setInterval(() => {
   canvasHelper.ctx?.clearRect(0, 0, canvas.width, canvas.height)
 
-  const BHRoot = createBarnesHutTree(particles)
+  const pointsCorners = getAreaCorners(particles),
+        BHRoot = createBarnesHutTree(particles, pointsCorners)
 
   for(const particle of particles) {
     const gravityPoints = simplifyBodiesForTarget(particle, BHRoot, 1e3).map(item => item.sectors ? item.data : item)
@@ -42,6 +66,7 @@ const loop = setInterval(() => {
   for(const particle of particles) particle.move()
 
   camera.render({debug: true})
+
   camera.canvasHelper.drawCursor()
 
   // console.log(+new Date() - start, 'ms')

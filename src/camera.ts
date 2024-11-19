@@ -81,6 +81,7 @@ export class Camera {
     this.focusedBody = particle
     this.pos = particle.pos
   }
+  
   removeFocusBody = () => {
     if(this.focusedBody) {
       this.focus(this.focusedBody.pos)
