@@ -10,5 +10,9 @@
   "description": "",
   "devDependencies": {
     "esbuild": "^0.24.0"
+  },
+  "dependencies": {
+    "@tweakpane/plugin-essentials": "^0.2.1",
+    "tweakpane": "^4.0.5"
   }
 }
