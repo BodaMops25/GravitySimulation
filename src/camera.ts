@@ -47,13 +47,15 @@ export class Camera {
     document.body.addEventListener("mousedown", event => {
       if(event.button !== 1) return
 
-        this.mousemove = true
+      this.mousemove = true
   
       this.mouseDelta.x = event.offsetX
       this.mouseDelta.y = event.offsetY
   
       this.anchored.x = this.pos.x
       this.anchored.y = this.pos.y
+
+      this.tweakpane?.refresh()
     })
   
     document.body.addEventListener("mouseup", event => {
@@ -69,6 +71,8 @@ export class Camera {
   
         this.pos.x = this.anchored.x - delta_x / this.scale
         this.pos.y = this.anchored.y - delta_y / this.scale
+
+        this.tweakpane?.refresh()
       }
     })
   }
@@ -111,5 +115,7 @@ export class Camera {
 
       if(debug) this.canvasHelper.drawVector(pos, velocity, 2, '#000')
     }
+
+    this.tweakpane?.refresh()
   }
 }

@@ -1,4 +1,4 @@
-import { CanvasHelper, GAME_PARAMS, getIntervalChangableDelay, randomBetween } from "./helpers"
+import { CanvasHelper, GAME_PARAMS, getIntervalChangableDelay, metricalIMS, number2MS, randomBetween } from "./helpers"
 import { Particle } from "./particles"
 import { Camera } from "./camera"
 import { gravityForceAll } from "./game"
@@ -178,6 +178,8 @@ cameraSettingsFolder.addBlade({
 })
 
 // cameraSettingsFolder.addBinding(GAME_PARAMS, 'focusBodyVelocity', {view: 'graph', readonly: true, min: 0, max: 1e5})
+cameraSettingsFolder.addBinding(camera.pos, 'x', {format: (value: number) => number2MS(value, metricalIMS, 'm', 3)})
+cameraSettingsFolder.addBinding(camera.pos, 'y', {format: (value: number) => number2MS(value, metricalIMS, 'm', 3)})
 cameraSettingsFolder.addBinding(camera, 'scale', {format: (value: number) => value.toExponential()})
 
 if(sessionStorage['gameSettings'] !== undefined) pane.importState(JSON.parse(sessionStorage['gameSettings']))

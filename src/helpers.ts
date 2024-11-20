@@ -17,6 +17,22 @@ export const metricalIMS = [
   {exp: 9, mark: 'G'},
 ]
 
+export function number2MS(number: number, marks: {exp: number, mark: string}[], zeroMark: string, digits: number) {
+  const isNegative = number < 0
+
+  if(isNegative) number *= -1
+
+  if(number < 10**marks[0].exp) return (isNegative ? '-' : '') + (number / 10**marks[0].exp).toFixed(digits) + ' ' + marks[0].mark + zeroMark
+  else if(number > 10**marks[marks.length-1].exp) return (isNegative ? '-' : '') + (number / 10**marks[marks.length-1].exp).toFixed(digits) + ' ' + marks[marks.length-1].mark + zeroMark
+
+  for(let i = 0; i < marks.length-1; i++) {
+    const {exp, mark} = marks[i],
+          {exp: exp2} = marks[i+1]
+
+    if(10**exp <= number && number < 10**exp2) return (isNegative ? '-' : '') + (number / 10**exp).toFixed(digits) + ' ' + mark + (exp !== 0 ? zeroMark : '')
+  }
+}
+
 export function getIntervalChangableDelay(callback: (...params: any[]) => void, ...params: any[]) {
   let interval: number | undefined = undefined
 
