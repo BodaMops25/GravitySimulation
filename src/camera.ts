@@ -1,3 +1,4 @@
+import { Pane } from "tweakpane"
 import { CanvasHelper, GAME_PARAMS, Vec } from "./helpers"
 import { Particle } from "./particles"
 
@@ -6,7 +7,8 @@ type CameraConstructor = {
   pos?: Vec,
   scale?: number,
   focusedBody?: Particle,
-  canvasHelper: CanvasHelper
+  canvasHelper: CanvasHelper,
+  tweakpane?: any
 }
 
 export class Camera {
@@ -15,16 +17,18 @@ export class Camera {
   scale: number
   particles: Particle[]
   canvasHelper: CanvasHelper
-  focusedBody: Particle | undefined
+  tweakpane?: any
+  focusedBody?: Particle
   mousemove: boolean
   mouseDelta: Vec
   anchored: Vec
 
-  constructor({particles, pos = {x: 0, y: 0}, scale = 1, focusedBody, canvasHelper}: CameraConstructor) {
+  constructor({particles, pos = {x: 0, y: 0}, scale = 1, focusedBody, canvasHelper, tweakpane}: CameraConstructor) {
     this.pos = pos
     this.scale = scale
     this.particles = particles
     this.canvasHelper = canvasHelper
+    this.tweakpane = tweakpane
     this.focusedBody = focusedBody
 
     this.mousemove = false
@@ -36,10 +40,14 @@ export class Camera {
       else if(event.deltaY < 0) this.scale *= 2
   
       sessionStorage['camera_scale'] = this.scale
+
+      this.tweakpane?.refresh()
     })
   
     document.body.addEventListener("mousedown", event => {
-      if(event.buttons === 1) this.mousemove = true
+      if(event.button !== 1) return
+
+        this.mousemove = true
   
       this.mouseDelta.x = event.offsetX
       this.mouseDelta.y = event.offsetY
@@ -73,8 +81,7 @@ export class Camera {
   }
 
   focus = (pos: Vec) => {
-    this.pos.x = pos.x
-    this.pos.y = pos.y
+    this.pos = {...pos}
   }
 
   focusBody = (particle: Particle) => {

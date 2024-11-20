@@ -2,7 +2,28 @@ export const GAME_PARAMS = {
   simulation_speed: 3600 * 6,
   gravity: 6.674 * 1e-11,
   AU: 150e9,
-  tick_speed: 65 || 120
+  tps: 65,
+  fps: 65,
+  gravityAlgorithmType: 'all', // 'all', 'barnes-hut'
+  barnesHutThreshold: 1 // working only with gravityAlgorithmType: 'barnes-hut', less value == more comparison => less performance
+}
+
+export const metricalIMS = [
+  {exp: -6, mark: 'mk'},
+  {exp: -3, mark: 'm'},
+  {exp: 0, mark: 'm'},
+  {exp: 3, mark: 'k'},
+  {exp: 6, mark: 'M'},
+  {exp: 9, mark: 'G'},
+]
+
+export function getIntervalChangableDelay(callback: (...params: any[]) => void, ...params: any[]) {
+  let interval: number | undefined = undefined
+
+  return function(newDelay: number) {
+    if(interval !== undefined) clearInterval(interval)
+    if(newDelay > 0 && newDelay < Infinity) interval = setInterval(callback, newDelay, ...params)
+  }
 }
 
 export function randomBetween(min: number, max: number) {

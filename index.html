@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Document</title>
-  <link rel="stylesheet" href="styles.css">
   <style>
     body {
       margin: 0;
@@ -19,11 +18,20 @@
       width: 100%;
       height: 100%;
     }
+
+    #pane-settings-container {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      width: 300px;
+    }
   </style>
 </head>
 <body>
   
   <canvas id="main-frame"></canvas>
+
+  <div id="pane-settings-container"></div>
 
   <script src="./dist/bundle.js"></script>
 </body>
