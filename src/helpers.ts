@@ -8,6 +8,17 @@ export const GAME_PARAMS = {
   barnesHutThreshold: 1 // working only with gravityAlgorithmType: 'barnes-hut', less value == more comparison => less performance
 }
 
+export const _game_params = {
+  camera: {
+    pos: {
+      x: 0,
+      y: 0
+    },
+    focusBodyVelocity: 0,
+    scale: 1
+  }
+}
+
 export const metricalIMS = [
   {exp: -6, mark: 'mk'},
   {exp: -3, mark: 'm'},
@@ -50,6 +61,10 @@ export function randomId(length: number) {
   let id = ''
   for(let i = 0; i < length; i++) id += String.fromCharCode(Math.round(randomBetween(65, 123)))
   return id
+}
+
+export function vecMagnitude(vec: Vec) {
+  return (vec.x**2 + vec.y**2)**.5
 }
 
 export function distance(pos2: Vec, pos: Vec) {

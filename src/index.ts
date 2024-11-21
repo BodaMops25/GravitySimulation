@@ -1,4 +1,4 @@
-import { CanvasHelper, GAME_PARAMS, getIntervalChangableDelay, metricalIMS, number2MS, randomBetween } from "./helpers"
+import { _game_params, CanvasHelper, GAME_PARAMS, getIntervalChangableDelay, metricalIMS, number2MS, randomBetween, Vec } from "./helpers"
 import { Particle } from "./particles"
 import { Camera } from "./camera"
 import { gravityForceAll } from "./game"
@@ -34,7 +34,7 @@ const particles: Particle[] = [],
       camera = new Camera({particles, canvasHelper, tweakpane: pane})
 
 camera.scale = +sessionStorage['camera_scale'] || 1
-camera.pos = JSON.parse(sessionStorage['camera_pos'] || '{"x": 0, "y": 0}')
+// camera.pos = JSON.parse(sessionStorage['camera_pos'] || '{"x": 0, "y": 0}')
 
 const frameRate = {
   tpsgraph: simulationSettingsFolder.addBlade({view: 'fpsgraph', label: 'TPS'}),
@@ -135,6 +135,18 @@ color: 'purple',
 radius: 1e3
 }))
 
+cameraSettingsFolder.addBinding(_game_params.camera, 'pos', {
+  label: 'pos',
+  x: {step: 1, min: -GAME_PARAMS.AU, max: GAME_PARAMS.AU, format: (value: number) => number2MS(value, metricalIMS, 'm', 1)},
+  y: {step: 1, min: -GAME_PARAMS.AU, max: GAME_PARAMS.AU, format: (value: number) => number2MS(value, metricalIMS, 'm', 1)},
+  picker: 'inline'
+}).on('change', ({last, value: pos}: {last: boolean, value: Vec}) => {
+  if(last) camera.setPos(pos, 'relative')
+})
+cameraSettingsFolder.addBinding(_game_params.camera, 'scale', {format: (value: number) => value.toExponential()})
+  .on('change', ({last, value}: {last: boolean, value: number}) => {
+    if(last) camera.scale = value
+  })
 
 cameraSettingsFolder.addBlade({
   view: 'list',
@@ -150,8 +162,6 @@ cameraSettingsFolder.addBlade({
   ],
   value: 'none',
 }).on('change', ({value: body}: {value: string}) => {
-  console.log(body)
-
   switch(body) {
     case 'none':
       camera.removeFocusBody()
@@ -176,12 +186,26 @@ cameraSettingsFolder.addBlade({
       break;
   }
 })
-
-// cameraSettingsFolder.addBinding(GAME_PARAMS, 'focusBodyVelocity', {view: 'graph', readonly: true, min: 0, max: 1e5})
-cameraSettingsFolder.addBinding(camera.pos, 'x', {format: (value: number) => number2MS(value, metricalIMS, 'm', 3)})
-cameraSettingsFolder.addBinding(camera.pos, 'y', {format: (value: number) => number2MS(value, metricalIMS, 'm', 3)})
-cameraSettingsFolder.addBinding(camera, 'scale', {format: (value: number) => value.toExponential()})
+cameraSettingsFolder.addBinding(_game_params.camera, 'focusBodyVelocity', {
+  label: 'bodyVelocity',
+  format: (value: number) => number2MS(value, metricalIMS, 'm/s', 3),
+  readonly: true
+})
+cameraSettingsFolder.addBinding(_game_params.camera, 'focusBodyVelocity', {
+  label: 'bodyVelocity',
+  view: 'graph',
+  min: 0,
+  max: 1e5,
+  readonly: true
+})
 
 if(sessionStorage['gameSettings'] !== undefined) pane.importState(JSON.parse(sessionStorage['gameSettings']))
 
-// camera.focusBody(earth)
+window.camera = camera
+window.sun = sun
+window.earth = earth
+window.moon = moon
+window.mars = mars
+window.mercury = mercury
+window.venus = venus
+window._game_params = _game_params
