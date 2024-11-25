@@ -1,10 +1,11 @@
 import { _game_params, CanvasHelper, GAME_PARAMS, getIntervalChangableDelay, metricalIMS, number2MS, randomBetween, Vec } from "./helpers"
 import { Particle } from "./particles"
 import { Camera } from "./camera"
-import { gravityForceAll } from "./game"
+import { getOrbitalVelocity, gravityForceAll } from "./game"
 import { createBarnesHutTree, getAreaCorners, simplifyBodiesForTarget } from "./barnes-hun"
 import {Pane} from 'tweakpane'
 import * as TweakpaneEssentials from '@tweakpane/plugin-essentials'
+import { KeyboardListener, keys } from "./hotkeys"
 
 // ---- SETTINGS ----
 
@@ -77,8 +78,6 @@ simulationSettingsFolder.addBinding(GAME_PARAMS, 'simulation_speed', {step: 1})
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'gravity', {format: (value: number) => value.toExponential()})
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'AU', {format: (value: number) => value.toExponential()})
 
-// if(sessionStorage['gameSettings'] !== undefined) pane.importState(JSON.parse(sessionStorage['gameSettings']))
-
 loopInterval(1000 / GAME_PARAMS.tps)
 renderInterval(1000 / GAME_PARAMS.fps)
 
@@ -127,18 +126,25 @@ moon = new Particle({
 
 particles.push(sun, earth, moon, mars, mercury, venus)
 
-for(let i = 0; i < 100; i++) particles.push(new Particle({
-  pos: {x: randomBetween(1e10, 1e12), y: randomBetween(-1e10, 1e10)},
-  mass: 1e20,
-  velocity: {x: randomBetween(-2e3, 2e3), y: 47e3 + randomBetween(-2e3, 2e3)},
-  color: 'purple',
-  radius: 1e3
-}))
+for(let i = 0; i < 200; i++) {
+  const p = new Particle({
+    pos: {x: randomBetween(20e9, 255e9), y: randomBetween(-1e10, 1e10)},
+    mass: 1e20,
+    color: 'purple',
+    radius: 1e3
+  })
+
+  p.velocity = getOrbitalVelocity(p, sun)
+  p.velocity.x *= randomBetween(.8, 1.2)
+  p.velocity.y *= randomBetween(.8, 1.2)
+
+  particles.push(p)
+}
 
 cameraSettingsFolder.addBinding(_game_params.camera, 'pos', {
   label: 'pos',
-  x: {step: 1, min: -GAME_PARAMS.AU, max: GAME_PARAMS.AU, format: (value: number) => number2MS(value, metricalIMS, 'm', 1)},
-  y: {step: 1, min: -GAME_PARAMS.AU, max: GAME_PARAMS.AU, format: (value: number) => number2MS(value, metricalIMS, 'm', 1)},
+  x: {step: 1, format: (value: number) => number2MS(value, metricalIMS, 'm', 1)},
+  y: {step: 1, format: (value: number) => number2MS(value, metricalIMS, 'm', 1)},
   picker: 'inline'
 }).on('change', ({last, value: pos}: {last: boolean, value: Vec}) => {
   if(last) camera.setPos(pos, 'relative')
@@ -209,3 +215,5 @@ window.mars = mars
 window.mercury = mercury
 window.venus = venus
 window._game_params = _game_params
+
+const keyboardHandler = new KeyboardListener({keymap: keys, tweakpane: pane})

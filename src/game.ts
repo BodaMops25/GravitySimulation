@@ -1,4 +1,4 @@
-import { angleBetweenVec, distance, GAME_PARAMS, polar2cartesian } from "./helpers"
+import { angleBetweenVec, distance, GAME_PARAMS, polar2cartesian, Vec } from "./helpers"
 import { Particle } from "./particles"
 
 export function gravityForce(particle: Particle, particle2: Particle) {
@@ -16,15 +16,15 @@ export function gravityForceAll(particle: Particle, particles: Particle[]) {
   particles.forEach(particle2 => gravityForce(particle, particle2))
 }
 
-export function getOrbitalVelocity(target: Particle, gravityBody: Particle) {
+export function getOrbitalVelocity(target: Particle, gravityBody: Particle, isAnticlockwise?: boolean) {
   const r = distance(gravityBody.pos, target.pos),
         speed = (GAME_PARAMS.gravity * gravityBody.mass / r)**.5,
         angle = angleBetweenVec(gravityBody.pos, target.pos),
-        velocity = polar2cartesian(speed, angle)
-
-  console.log(speed, angle/Math.PI*180)
+        velocity = polar2cartesian(speed, angle + (isAnticlockwise ? -Math.PI/2 : Math.PI/2))
 
   return velocity
 }
 
-window.getOrbitalVelocity = getOrbitalVelocity
+export function setSatelite2Body(target: Particle, body: Particle, relativePos: Vec) {
+  
+}

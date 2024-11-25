@@ -8,6 +8,8 @@ export const GAME_PARAMS = {
   barnesHutThreshold: 1 // working only with gravityAlgorithmType: 'barnes-hut', less value == more comparison => less performance
 }
 
+window.GAME_PARAMS = GAME_PARAMS
+
 export const _game_params = {
   camera: {
     pos: {
@@ -15,7 +17,7 @@ export const _game_params = {
       y: 0
     },
     focusBodyVelocity: 0,
-    scale: 1
+    scale: 9e-10
   }
 }
 
@@ -47,10 +49,13 @@ export function number2MS(number: number, marks: {exp: number, mark: string}[], 
 export function getIntervalChangableDelay(callback: (...params: any[]) => void, ...params: any[]) {
   let interval: number | undefined = undefined
 
-  return function(newDelay: number) {
+  const func = function(newDelay: number) {
     if(interval !== undefined) clearInterval(interval)
-    if(newDelay > 0 && newDelay < Infinity) interval = setInterval(callback, newDelay, ...params)
+    if(newDelay === Infinity) newDelay = 0
+    if(newDelay > 0) interval = setInterval(callback, newDelay, ...params)
   }
+
+  return func
 }
 
 export function randomBetween(min: number, max: number) {
