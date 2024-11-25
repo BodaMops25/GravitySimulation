@@ -71,6 +71,17 @@ export function distance(pos2: Vec, pos: Vec) {
   return ((pos2.x - pos.x)**2 + (pos2.y - pos.y)**2)**.5
 }
 
+export function angleBetweenVec(vec2: Vec, vec1: Vec) {
+  return Math.atan2(vec2.x - vec1.x, vec2.y - vec1.y)
+}
+
+export function polar2cartesian(magninude: number, angle: number): Vec {
+  return {
+    x: Math.sin(angle) * magninude,
+    y: Math.cos(angle) * magninude
+  }
+}
+
 export class CanvasHelper {
   canvas: HTMLCanvasElement
   ctx: CanvasRenderingContext2D | null

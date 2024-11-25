@@ -128,11 +128,11 @@ moon = new Particle({
 particles.push(sun, earth, moon, mars, mercury, venus)
 
 for(let i = 0; i < 100; i++) particles.push(new Particle({
-pos: {x: .4 * GAME_PARAMS.AU + randomBetween(-1e10, 1e10), y: randomBetween(-1e10, 1e10)},
-mass: 1e20,
-velocity: {x: randomBetween(-2e3, 2e3), y: 47e3 + randomBetween(-2e3, 2e3)},
-color: 'purple',
-radius: 1e3
+  pos: {x: randomBetween(1e10, 1e12), y: randomBetween(-1e10, 1e10)},
+  mass: 1e20,
+  velocity: {x: randomBetween(-2e3, 2e3), y: 47e3 + randomBetween(-2e3, 2e3)},
+  color: 'purple',
+  radius: 1e3
 }))
 
 cameraSettingsFolder.addBinding(_game_params.camera, 'pos', {
