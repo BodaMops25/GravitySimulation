@@ -152,9 +152,27 @@ export class CanvasHelper {
     }
   
     this.ctx.lineTo(to.x, to.y)
+    
+    const arrowAngle = Math.atan2(to.x - x, to.y - y),
+          arrowAngleSharpness = .72,
+          arrowLengthMultiplier = 6
+
+    this.ctx.moveTo(
+      to.x - scale * arrowLengthMultiplier * Math.sin(arrowAngle + arrowAngleSharpness),
+      to.y - scale * arrowLengthMultiplier * Math.cos(arrowAngle + arrowAngleSharpness)
+    )
+
+    this.ctx.lineTo(to.x, to.y)
+
+    this.ctx.lineTo(
+      to.x - scale * arrowLengthMultiplier * Math.sin(arrowAngle - arrowAngleSharpness),
+      to.y - scale * arrowLengthMultiplier * Math.cos(arrowAngle - arrowAngleSharpness)
+    )
+
     this.ctx.stroke()
-    this.ctx.beginPath()
-    this.drawBall({pos: to, scale: scale * 1.5, color})
+    
+    // this.ctx.beginPath()
+    // this.drawBall({pos: to, scale: scale * 1.5, color})
   }
   
   drawCursor = () => {

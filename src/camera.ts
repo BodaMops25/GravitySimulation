@@ -191,6 +191,14 @@ export class Camera {
         })
       }
 
+      this.canvasHelper.drawVector({x: 250, y: 1000}, {x: 200, y: -200}, 5, '#fff', 'relative')
+      this.canvasHelper.drawVector({x: 500, y: 1000}, {x: 0, y: -200}, 5, '#fff', 'relative')
+      this.canvasHelper.drawVector({x: 750, y: 1000}, {x: -200, y: -200}, 5, '#fff', 'relative')
+
+      this.canvasHelper.drawVector({x: 250, y: 200}, {x: 200, y: 200}, 5, '#fff', 'relative')
+      this.canvasHelper.drawVector({x: 500, y: 200}, {x: 0, y: 200}, 5, '#fff', 'relative')
+      this.canvasHelper.drawVector({x: 750, y: 200}, {x: -200, y: 200}, 5, '#fff', 'relative')
+
       // if(debug) this.canvasHelper.drawVector(pos, velocity, 2, '#000')
     }
 
