@@ -96,16 +96,37 @@ export class CanvasHelper {
     this.ctx = canvas.getContext('2d')
   }
 
-  drawBall = ({x, y}: Vec, scale: number = 50, color: string = '#fff') => {
+  drawBall = ({
+    pos: {x, y},
+    scale,
+    color,
+    strokeScale,
+    strokeColor
+  }: {
+    pos: Vec,
+    scale: number,
+    color?: string,
+    strokeScale?: number,
+    strokeColor?: string
+  }) => {
     if(!this.ctx) {
       console.warn('No canvas context2D!')
       return
     }
 
     this.ctx.beginPath()
-    this.ctx.fillStyle = color
     this.ctx.arc(x, y, scale, 0, Math.PI*2)
-    this.ctx.fill()
+
+    if(color) {
+      this.ctx.fillStyle = color
+      this.ctx.fill()
+    }
+
+    if(strokeScale || strokeColor) {
+      this.ctx.lineWidth = strokeScale || scale / 10
+      this.ctx.strokeStyle = strokeColor || '#000'
+      this.ctx.stroke()
+    }
   }
   
   drawVector = ({x, y}: Vec, {x: to_x, y: to_y}: Vec, scale = 10, color = '#fff', mode?: 'relative') => {
@@ -133,7 +154,7 @@ export class CanvasHelper {
     this.ctx.lineTo(to.x, to.y)
     this.ctx.stroke()
     this.ctx.beginPath()
-    this.drawBall(to, scale * 1.5, color)
+    this.drawBall({pos: to, scale: scale * 1.5, color})
   }
   
   drawCursor = () => {
@@ -165,3 +186,16 @@ export type Vec = {
   x: number,
   y: number
 } 
+
+export function findPaneChildByLable(paneObj: any, label: string, deep = 0) {
+  if(deep > 1000) {
+    console.warn('Too much recursion!')
+    return
+  }
+  if(paneObj.label === label) return paneObj
+
+  for(const child of paneObj.children) {
+    if(child.label === label) return child
+    else return findPaneChildByLable(child, label)
+  }
+}

@@ -7,7 +7,11 @@ type CameraConstructor = {
   scale?: number,
   focusedBody?: Particle,
   canvasHelper: CanvasHelper,
-  tweakpane?: any
+  tweakpane?: any,
+  bodyVelocityPanes?: {
+    number?: any
+    graph?: any
+  }
 }
 
 export class Camera {
@@ -17,12 +21,16 @@ export class Camera {
   particles: Particle[]
   canvasHelper: CanvasHelper
   tweakpane?: any
+  bodyVelocityPanes?: {
+    number?: any
+    graph?: any
+  }
   focusedBody?: Particle
   mousemove: boolean
   lastPos: Vec
   anchored: Vec
 
-  constructor({particles, pos = {x: 0, y: 0}, scale = 1, focusedBody, canvasHelper, tweakpane}: CameraConstructor) {
+  constructor({particles, pos = {x: 0, y: 0}, scale = 1, focusedBody, canvasHelper, tweakpane, bodyVelocityPanes}: CameraConstructor) {
     
     this._pos = {...pos}
 
@@ -30,6 +38,7 @@ export class Camera {
     this.particles = particles
     this.canvasHelper = canvasHelper
     this.tweakpane = tweakpane
+    this.bodyVelocityPanes = bodyVelocityPanes
     this.focusedBody = focusedBody
 
     this.mousemove = false
@@ -39,8 +48,6 @@ export class Camera {
     document.body.addEventListener("wheel", event => {
       if(event.deltaY > 0) this.scale /= 2
       else if(event.deltaY < 0) this.scale *= 2
-  
-      sessionStorage['camera_scale'] = this.scale
     })
   
     document.body.addEventListener("mousedown", event => {
@@ -70,8 +77,6 @@ export class Camera {
       if(event.button !== 1) return
 
       this.mousemove = false
-
-      // sessionStorage['camera_pos'] = JSON.stringify(this.pos)
     })
   }
 
@@ -113,6 +118,15 @@ export class Camera {
     }
   }
 
+  mapSize2CameraSize = (number: number, minSize?: number) => {
+    const size = {value: this.scale * number, status: 'original'}
+    if(minSize && size.value < minSize) {
+      size.value = minSize
+      size.status = 'minSize'
+    }
+    return size
+  }
+
   map2CameraPos = (pos: Vec) => {
     const cameraPos = this.getPos('absolute')
     return {
@@ -124,6 +138,14 @@ export class Camera {
   focusBody = (particle: Particle) => {
     this.focusedBody = particle
     this.setPos({x: 0, y: 0}, 'relative')
+    if(this.bodyVelocityPanes && this.bodyVelocityPanes.number) {
+      this.bodyVelocityPanes.number.hidden = false
+    }
+    if(this.bodyVelocityPanes && this.bodyVelocityPanes.graph) {
+      this.bodyVelocityPanes.graph.hidden = false
+    }
+
+    sessionStorage['focus-body'] = particle.label
   }
   
   removeFocusBody = () => {
@@ -131,6 +153,15 @@ export class Camera {
     this.focusedBody = undefined
     this.setPos(coords, 'absolute')
     _game_params.camera.focusBodyVelocity = 0
+
+    if(this.bodyVelocityPanes && this.bodyVelocityPanes.number) {
+      this.bodyVelocityPanes.number.hidden = true
+    }
+    if(this.bodyVelocityPanes && this.bodyVelocityPanes.graph) {
+      this.bodyVelocityPanes.graph.hidden = true
+    }
+
+    sessionStorage['focus-body'] = undefined
   }
 
   render = ({debug}: {debug?: boolean} = {}) => {
@@ -142,11 +173,25 @@ export class Camera {
               x: particle.pos.x + particle.velocity.x * GAME_PARAMS.simulation_speed,
               y: particle.pos.y + particle.velocity.y * GAME_PARAMS.simulation_speed
             }),
-            scale = particle.radius * this.scale
+            // scale = this.mapSize2CameraSize(particle.radius)
+            scale = this.mapSize2CameraSize(particle.radius, 3)
 
-      this.canvasHelper.drawBall(pos, scale < 5 ? 5 : scale, particle.color)
+      this.canvasHelper.drawBall({
+        pos, 
+        scale: scale.value,
+        color: particle.color,
+      })
 
-      if(debug) this.canvasHelper.drawVector(pos, velocity, 2, '#000')
+      if(scale.status === 'minSize') {
+        this.canvasHelper.drawBall({
+          pos,
+          scale: scale.value + 2,
+          strokeScale: 1,
+          strokeColor: '#fff'
+        })
+      }
+
+      // if(debug) this.canvasHelper.drawVector(pos, velocity, 2, '#000')
     }
 
     _game_params.camera.pos = this.getPos('relative')
