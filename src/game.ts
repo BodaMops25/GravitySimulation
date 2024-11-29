@@ -1,4 +1,4 @@
-import { angleBetweenVec, distance, GAME_PARAMS, polar2cartesian, Vec } from "./helpers"
+import { angleBetweenVec, distance, GAME_PARAMS, polar2cartesian } from "./helpers"
 import { Particle } from "./particles"
 
 export function gravityForce(particle: Particle, particle2: Particle) {
@@ -25,6 +25,15 @@ export function getOrbitalVelocity(target: Particle, gravityBody: Particle, isAn
   return velocity
 }
 
-export function setSatelite2Body(target: Particle, body: Particle, relativePos: Vec) {
-  
+export function setSatellite2Body(target: Particle, body: Particle, height: number, angle: number, isOrbital?: boolean) {
+  const pos = polar2cartesian(height, angle/180*Math.PI)
+
+  target.pos.x = body.pos.x + pos.x
+  target.pos.y = body.pos.y + pos.y
+
+  if(isOrbital) {
+    const orbitalVelocity = getOrbitalVelocity(target, body)
+    target.velocity.x = body.velocity.x + orbitalVelocity.x
+    target.velocity.y = body.velocity.y + orbitalVelocity.y
+  }
 }

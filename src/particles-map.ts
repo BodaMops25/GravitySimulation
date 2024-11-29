@@ -1,5 +1,5 @@
-import { getOrbitalVelocity } from "./game"
-import { GAME_PARAMS, randomBetween, randomId } from "./helpers"
+import { getOrbitalVelocity, setSatellite2Body } from "./game"
+import { GAME_PARAMS, randomBetween } from "./helpers"
 import { Particle } from "./particles"
 
 const particlesMap: Particle[] = []

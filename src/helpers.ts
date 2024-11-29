@@ -170,9 +170,6 @@ export class CanvasHelper {
     )
 
     this.ctx.stroke()
-    
-    // this.ctx.beginPath()
-    // this.drawBall({pos: to, scale: scale * 1.5, color})
   }
   
   drawCursor = () => {

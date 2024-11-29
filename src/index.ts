@@ -44,6 +44,8 @@ const frameRate = {
 const loopInterval = getIntervalChangableDelay(() => {
   frameRate.tpsgraph.begin()
 
+  for(const particle of particles) particle.move()
+
   if(GAME_PARAMS.gravityAlgorithmType === 'all') {
     for(const particle of particles) gravityForceAll(particle, particles)
   }
@@ -57,7 +59,7 @@ const loopInterval = getIntervalChangableDelay(() => {
     }
   }
 
-  for(const particle of particles) particle.move()
+  // for(const particle of particles) particle.move()
 
   frameRate.tpsgraph.end()
 })

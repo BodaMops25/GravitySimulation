@@ -135,6 +135,37 @@ export class Camera {
     }
   }
 
+  drawVector = (pos: Vec, to: Vec, size: {size: number, minSize?: number}, color?: string, mode?: 'relative') => {
+
+    this.canvasHelper.drawVector(
+      this.map2CameraPos(pos),
+      this.map2CameraPos(mode === 'relative' ? {x: pos.x + to.x, y: pos.y + to.y} : to),
+      this.mapSize2CameraSize(size.size, size.minSize).value,
+      color
+    )
+  }
+
+  drawBody = (particle: Particle) => {
+
+    const pos = this.map2CameraPos(particle.pos),
+            scale = this.mapSize2CameraSize(particle.radius, 3)
+    
+    this.canvasHelper.drawBall({
+      pos, 
+      scale: scale.value,
+      color: particle.color,
+    })
+
+    if(scale.status === 'minSize') {
+      this.canvasHelper.drawBall({
+        pos,
+        scale: scale.value + 2,
+        strokeScale: 1,
+        strokeColor: '#fff'
+      })
+    }
+  }
+
   focusBody = (particle: Particle) => {
     this.focusedBody = particle
     this.setPos({x: 0, y: 0}, 'relative')
@@ -168,38 +199,16 @@ export class Camera {
 
     for(const particle of this.particles) {
 
-      const pos = this.map2CameraPos(particle.pos),
-            velocity = this.map2CameraPos({
-              x: particle.pos.x + particle.velocity.x * GAME_PARAMS.simulation_speed,
-              y: particle.pos.y + particle.velocity.y * GAME_PARAMS.simulation_speed
-            }),
-            // scale = this.mapSize2CameraSize(particle.radius)
-            scale = this.mapSize2CameraSize(particle.radius, 3)
+      this.drawBody(particle)
 
-      this.canvasHelper.drawBall({
-        pos, 
-        scale: scale.value,
-        color: particle.color,
-      })
+      if(debug) {
+        const realVelocity = {
+          x: particle.velocity.x * GAME_PARAMS.simulation_speed,
+          y: particle.velocity.y * GAME_PARAMS.simulation_speed
+        }
 
-      if(scale.status === 'minSize') {
-        this.canvasHelper.drawBall({
-          pos,
-          scale: scale.value + 2,
-          strokeScale: 1,
-          strokeColor: '#fff'
-        })
+        this.drawVector(particle.pos, realVelocity, {size: 1, minSize: 1}, '#fff', 'relative')
       }
-
-      this.canvasHelper.drawVector({x: 250, y: 1000}, {x: 200, y: -200}, 5, '#fff', 'relative')
-      this.canvasHelper.drawVector({x: 500, y: 1000}, {x: 0, y: -200}, 5, '#fff', 'relative')
-      this.canvasHelper.drawVector({x: 750, y: 1000}, {x: -200, y: -200}, 5, '#fff', 'relative')
-
-      this.canvasHelper.drawVector({x: 250, y: 200}, {x: 200, y: 200}, 5, '#fff', 'relative')
-      this.canvasHelper.drawVector({x: 500, y: 200}, {x: 0, y: 200}, 5, '#fff', 'relative')
-      this.canvasHelper.drawVector({x: 750, y: 200}, {x: -200, y: 200}, 5, '#fff', 'relative')
-
-      // if(debug) this.canvasHelper.drawVector(pos, velocity, 2, '#000')
     }
 
     _game_params.camera.pos = this.getPos('relative')
