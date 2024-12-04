@@ -5,7 +5,7 @@ import { gravityForceAll } from "./game"
 import { createBarnesHutTree, getAreaCorners, simplifyBodiesForTarget } from "./barnes-hun"
 import {Pane} from 'tweakpane'
 import * as TweakpaneEssentials from '@tweakpane/plugin-essentials'
-import { KeyboardListener, keys } from "./hotkeys"
+import { KeyboardListener } from "./hotkeys"
 import particlesMap from "./particles-map"
 
 // ---- SETTINGS ----
@@ -33,8 +33,8 @@ canvas.height = innerHeight
 
 const particles: Particle[] = [],
       canvasHelper = new CanvasHelper(canvas),
-      camera = new Camera({particles, canvasHelper, tweakpane: pane}),
-      keyboardHandler = new KeyboardListener({keymap: keys, tweakpane: pane})
+      keyboardHandler = new KeyboardListener({tweakpane: pane}),
+      camera = new Camera({particles, canvasHelper, tweakpane: pane, keyboardHandler})
 
 const frameRate = {
   tpsgraph: simulationSettingsFolder.addBlade({view: 'fpsgraph', label: 'TPS'}),
@@ -47,7 +47,14 @@ const loopInterval = getIntervalChangableDelay(() => {
   for(const particle of particles) particle.move()
 
   if(GAME_PARAMS.gravityAlgorithmType === 'all') {
-    for(const particle of particles) gravityForceAll(particle, particles)
+    for(const particle of particles) {
+      if(camera.focusedBody) {
+        _game_params.camera.focusBodyGravityPoints = gravityForceAll(particle, particles)
+        continue
+      }
+      
+      gravityForceAll(particle, particles)
+    }
   }
   else if( GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') {
     const pointsCorners = getAreaCorners(particles),
@@ -55,6 +62,12 @@ const loopInterval = getIntervalChangableDelay(() => {
 
     for(const particle of particles) {
       const gravityPoints = simplifyBodiesForTarget(particle, BHRoot, GAME_PARAMS.barnesHutThreshold).map(item => item.sectors ? item.data : item)
+
+      if(camera.focusedBody) {
+        _game_params.camera.focusBodyGravityPoints = gravityForceAll(particle, gravityPoints)
+        continue
+      }
+      
       gravityForceAll(particle, gravityPoints)
     }
   }
@@ -75,7 +88,7 @@ const renderInterval = getIntervalChangableDelay(() => {
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'tps', {min: 0, max: 1000, step: 1}).on('change', ({last, value}: {last: boolean, value: number}) => last && loopInterval(1000 / value))
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'fps', {min: 0, max: 1000, step: 1}).on('change', ({last, value}: {last: boolean, value: number}) => last && renderInterval(1000 / value))
 
-simulationSettingsFolder.addBinding(GAME_PARAMS, 'simulation_speed', {step: 1})
+simulationSettingsFolder.addBinding(GAME_PARAMS, 'simulationSpeed', {step: 1})
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'gravity', {format: (value: number) => value.toExponential()})
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'AU', {format: (value: number) => value.toExponential()})
 
@@ -95,7 +108,7 @@ cameraSettingsFolder.addBinding(_game_params.camera, 'scale', {format: (value: n
 camera.bodyVelocityPanes = {
   number: cameraSettingsFolder.addBinding(_game_params.camera, 'focusBodyVelocity', {
     label: 'bodyVelocity',
-    format: (value: number) => number2MS(value, metricalIMS, 'm/s', 3),
+    format: (value: number) => number2MS(value, metricalIMS, 'm/t', 3),
     readonly: true,
   }),
   graph: cameraSettingsFolder.addBinding(_game_params.camera, 'focusBodyVelocity', {

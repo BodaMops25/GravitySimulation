@@ -1,7 +1,7 @@
-import { GAME_PARAMS } from "./helpers"
+import { GAME_PARAMS, Vec } from "./helpers"
 
 type KeyboardKey = 
-    'Space'
+    'Space' | 'KeyF'
 
 type KeyboardMap = {
     [key in KeyboardKey]: (event: KeyboardEvent) => void
@@ -11,9 +11,13 @@ export class KeyboardListener {
     keymap: KeyboardMap
     tweakpane?: any
 
-    constructor({keymap, tweakpane}: {keymap: KeyboardMap, tweakpane?: any}) {
-        this.keymap = keymap
+    mouse_pos: Vec
+    focus_body_request: boolean
+
+    constructor({tweakpane}: {tweakpane?: any}) {
         this.tweakpane = tweakpane
+        this.mouse_pos = {x: 0, y: 0}
+        this.focus_body_request = false
 
         document.addEventListener('keypress', (event) => {
 
@@ -24,21 +28,26 @@ export class KeyboardListener {
                 this.tweakpane?.refresh()
             }
         })
-    }
-}
 
-const keysData = {
-    tmpTPS: 0
-}
-export const keys: KeyboardMap = {
-    'Space': (event: KeyboardEvent) => {
+        document.addEventListener('mousemove', (event) => {
 
-        if(GAME_PARAMS.tps > 0) {
-            keysData.tmpTPS = GAME_PARAMS.tps
-            GAME_PARAMS.tps = 0
-        }
-        else {
-            GAME_PARAMS.tps = keysData.tmpTPS
+            this.mouse_pos.x = event.clientX
+            this.mouse_pos.y = event.clientY
+        })
+
+        this.keymap = {
+            'Space': () => {
+        
+                if(GAME_PARAMS.tps > 0) {
+                    sessionStorage['saved_tps'] = GAME_PARAMS.tps
+                    GAME_PARAMS.tps = 0
+                }
+                else {
+                    GAME_PARAMS.tps = +sessionStorage['saved_tps']
+                }
+            },
+        
+            'KeyF': (event) => this.focus_body_request = true,
         }
     }
 }

@@ -1,24 +1,37 @@
 export const GAME_PARAMS = {
-  simulation_speed: 3600 * 6,
+  simulationSpeed: 3600 * 6,
   gravity: 6.674 * 1e-11,
   AU: 150e9,
   tps: 65,
   fps: 65,
   gravityAlgorithmType: 'all', // 'all', 'barnes-hut'
-  barnesHutThreshold: 1 // working only with gravityAlgorithmType: 'barnes-hut', less value == more comparison => less performance
+  barnesHutThreshold: 1, // working only with gravityAlgorithmType: 'barnes-hut', less value == more comparison => less performance
+  mapBodyMinSize: 3,
+  mapBodyCircleOffset: 2,
 }
 
 window.GAME_PARAMS = GAME_PARAMS
 
-export const _game_params = {
+export const _game_params: {
+  camera: {
+    pos: {
+      x: number,
+      y: number
+    },
+    focusBodyVelocity: number,
+    focusBodyGravityPoints: Vec[],
+    scale: number
+  }
+} = {
   camera: {
     pos: {
       x: 0,
       y: 0
     },
     focusBodyVelocity: 0,
+    focusBodyGravityPoints: [],
     scale: 9e-10
-  }
+  },
 }
 
 export const metricalIMS = [
@@ -77,13 +90,13 @@ export function distance(pos2: Vec, pos: Vec) {
 }
 
 export function angleBetweenVec(vec2: Vec, vec1: Vec) {
-  return Math.atan2(vec2.x - vec1.x, vec2.y - vec1.y)
+  return Math.atan2(vec2.y - vec1.y, vec2.x - vec1.x)
 }
 
 export function polar2cartesian(magninude: number, angle: number): Vec {
   return {
-    x: Math.sin(angle) * magninude,
-    y: Math.cos(angle) * magninude
+    x: Math.cos(angle) * magninude,
+    y: Math.sin(angle) * magninude
   }
 }
 
@@ -96,6 +109,51 @@ export class CanvasHelper {
     this.ctx = canvas.getContext('2d')
   }
 
+  nonLinearGradient = ({
+    pos1, r,
+    pos2, R,
+    hexColor,
+    opacityFunction,
+    steps = 16,
+    shape = 'linear'
+  }: {
+    pos1: Vec,
+    r?: number,
+    pos2: Vec,
+    R?: number,
+    hexColor: string,
+    opacityFunction: (x: number) => number,
+    steps?: number,
+    shape?: 'linear' | 'radial'
+  }) => {
+    if(!this.ctx) return
+
+    let gradient: CanvasGradient
+
+    if(shape === 'linear') gradient = this.ctx.createLinearGradient(pos1.x, pos1.y, pos2.x, pos2.y);
+    else if(shape === 'radial') {
+      if(r === undefined || R === undefined) {
+        console.error('no inner radius or outer radius param')
+        return
+      }
+      gradient = this.ctx.createRadialGradient(pos1.x, pos1.y, r, pos2.x, pos2.y, R);
+    }
+    else {
+      console.error('invalid gradient shape')
+        return
+    }
+
+    for (let i = 0; i <= steps; i++) {
+      const position = i / steps, // Linear position [0, 1]
+            opacity = opacityFunction(position), // Apply f(x) to determine opacity
+            opacityAsHex = (opacity > 1 ? 0 : opacity < 0 ? 255 : Math.round(255 - opacity*255)).toString(16).padStart(2, '0')
+
+      gradient.addColorStop(position, hexColor + opacityAsHex);
+    }
+
+    return gradient;
+  }
+
   drawBall = ({
     pos: {x, y},
     scale,
@@ -105,9 +163,9 @@ export class CanvasHelper {
   }: {
     pos: Vec,
     scale: number,
-    color?: string,
+    color?: string | CanvasGradient | CanvasPattern,
     strokeScale?: number,
-    strokeColor?: string
+    strokeColor?: string | CanvasGradient | CanvasPattern
   }) => {
     if(!this.ctx) {
       console.warn('No canvas context2D!')
@@ -129,7 +187,26 @@ export class CanvasHelper {
     }
   }
   
-  drawVector = ({x, y}: Vec, {x: to_x, y: to_y}: Vec, scale = 10, color = '#fff', mode?: 'relative') => {
+  drawVector = ({
+    pos: {x, y},
+    posTo: {x: to_x, y: to_y},
+    size = 10,
+    color = '#fff',
+    mode ='relative',
+    text
+  }: {
+    pos: Vec,
+    posTo: Vec,
+    size?: number,
+    color?: string | CanvasGradient | CanvasPattern,
+    mode?: 'relative' | 'absolute'
+    text?: {
+      size: number,
+      color?: string | CanvasGradient | CanvasPattern,
+      pos?: Vec,
+      string: string
+    }
+  }) => {
     if(!this.ctx) {
       console.warn('No canvas context2D!')
       return
@@ -138,7 +215,7 @@ export class CanvasHelper {
     this.ctx.beginPath()
     this.ctx.fillStyle = color
     this.ctx.strokeStyle = color
-    this.ctx.lineWidth = scale
+    this.ctx.lineWidth = size
     this.ctx.moveTo(x, y)
   
     const to = {
@@ -158,18 +235,27 @@ export class CanvasHelper {
           arrowLengthMultiplier = 6
 
     this.ctx.moveTo(
-      to.x - scale * arrowLengthMultiplier * Math.sin(arrowAngle + arrowAngleSharpness),
-      to.y - scale * arrowLengthMultiplier * Math.cos(arrowAngle + arrowAngleSharpness)
+      to.x - size * arrowLengthMultiplier * Math.sin(arrowAngle + arrowAngleSharpness),
+      to.y - size * arrowLengthMultiplier * Math.cos(arrowAngle + arrowAngleSharpness)
     )
 
     this.ctx.lineTo(to.x, to.y)
 
     this.ctx.lineTo(
-      to.x - scale * arrowLengthMultiplier * Math.sin(arrowAngle - arrowAngleSharpness),
-      to.y - scale * arrowLengthMultiplier * Math.cos(arrowAngle - arrowAngleSharpness)
+      to.x - size * arrowLengthMultiplier * Math.sin(arrowAngle - arrowAngleSharpness),
+      to.y - size * arrowLengthMultiplier * Math.cos(arrowAngle - arrowAngleSharpness)
     )
 
     this.ctx.stroke()
+
+    if(text) {
+      if(text.color) this.ctx.fillStyle = text.color
+      this.ctx.font = text.size + 'px sans-serif'
+
+      text.string.split('/n').forEach((line, i) => {
+        this.ctx?.fillText(line, to.x + (text.pos?.x ?? 0), to.y + (text.pos?.y ?? 0) + text.size*i)
+      })
+    }
   }
   
   drawCursor = () => {
