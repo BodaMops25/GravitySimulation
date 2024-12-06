@@ -4,7 +4,7 @@ export const GAME_PARAMS = {
   AU: 150e9,
   tps: 65,
   fps: 65,
-  gravityAlgorithmType: 'all', // 'all', 'barnes-hut'
+  gravityAlgorithmType: 'barnes-hut', // 'all', 'barnes-hut'
   barnesHutThreshold: 1, // working only with gravityAlgorithmType: 'barnes-hut', less value == more comparison => less performance
   mapBodyMinSize: 3,
   mapBodyCircleOffset: 2,
@@ -43,7 +43,7 @@ export const metricalIMS = [
   {exp: 9, mark: 'G'},
 ]
 
-export function number2MS(number: number, marks: {exp: number, mark: string}[], zeroMark: string, digits: number) {
+export function number2MS(number: number, marks: {exp: number, mark: string}[], zeroMark: string, digits = 0) {
   const isNegative = number < 0
 
   if(isNegative) number *= -1
@@ -191,21 +191,30 @@ export class CanvasHelper {
     pos: {x, y},
     posTo: {x: to_x, y: to_y},
     size = 10,
+    arrowSize = 6,
     color = '#fff',
     mode ='relative',
-    text
+    textStart,
+    textEnd
   }: {
     pos: Vec,
     posTo: Vec,
     size?: number,
+    arrowSize?: number,
     color?: string | CanvasGradient | CanvasPattern,
     mode?: 'relative' | 'absolute'
-    text?: {
+    textStart?: {
       size: number,
       color?: string | CanvasGradient | CanvasPattern,
       pos?: Vec,
       string: string
-    }
+    },
+    textEnd?: {
+      size: number,
+      color?: string | CanvasGradient | CanvasPattern,
+      pos?: Vec,
+      string: string
+    },
   }) => {
     if(!this.ctx) {
       console.warn('No canvas context2D!')
@@ -231,29 +240,37 @@ export class CanvasHelper {
     this.ctx.lineTo(to.x, to.y)
     
     const arrowAngle = Math.atan2(to.x - x, to.y - y),
-          arrowAngleSharpness = .72,
-          arrowLengthMultiplier = 6
+          arrowAngleSharpness = .72
 
     this.ctx.moveTo(
-      to.x - size * arrowLengthMultiplier * Math.sin(arrowAngle + arrowAngleSharpness),
-      to.y - size * arrowLengthMultiplier * Math.cos(arrowAngle + arrowAngleSharpness)
+      to.x - size * arrowSize * Math.sin(arrowAngle + arrowAngleSharpness),
+      to.y - size * arrowSize * Math.cos(arrowAngle + arrowAngleSharpness)
     )
 
     this.ctx.lineTo(to.x, to.y)
 
     this.ctx.lineTo(
-      to.x - size * arrowLengthMultiplier * Math.sin(arrowAngle - arrowAngleSharpness),
-      to.y - size * arrowLengthMultiplier * Math.cos(arrowAngle - arrowAngleSharpness)
+      to.x - size * arrowSize * Math.sin(arrowAngle - arrowAngleSharpness),
+      to.y - size * arrowSize * Math.cos(arrowAngle - arrowAngleSharpness)
     )
 
     this.ctx.stroke()
 
-    if(text) {
-      if(text.color) this.ctx.fillStyle = text.color
-      this.ctx.font = text.size + 'px sans-serif'
+    if(textStart) {
+      if(textStart.color) this.ctx.fillStyle = textStart.color
+      this.ctx.font = textStart.size + 'px sans-serif'
 
-      text.string.split('/n').forEach((line, i) => {
-        this.ctx?.fillText(line, to.x + (text.pos?.x ?? 0), to.y + (text.pos?.y ?? 0) + text.size*i)
+      textStart.string.split('/n').forEach((line, i) => {
+        this.ctx?.fillText(line, x + (textStart.pos?.x ?? 0), y + (textStart.pos?.y ?? 0) + textStart.size*i)
+      })
+    }
+
+    if(textEnd) {
+      if(textEnd.color) this.ctx.fillStyle = textEnd.color
+      this.ctx.font = textEnd.size + 'px sans-serif'
+
+      textEnd.string.split('/n').forEach((line, i) => {
+        this.ctx?.fillText(line, to.x + (textEnd.pos?.x ?? 0), to.y + (textEnd.pos?.y ?? 0) + textEnd.size*i)
       })
     }
   }
@@ -299,4 +316,33 @@ export function findPaneChildByLable(paneObj: any, label: string, deep = 0) {
     if(child.label === label) return child
     else return findPaneChildByLable(child, label)
   }
+}
+
+export function number2avarageGroup(arr: number[], threshold: number) {
+    const finalArray = []
+    let group = []
+
+    for(let i = 0; i < arr.length; i++) {
+      const v1 = arr[i],
+            v2 = arr[i+1]
+
+      if(v2 !== undefined && v2 - v1 <= threshold) {
+        group.push(v1)
+        continue
+      }
+      
+      if(group.length < 1) {
+        finalArray.push(v1)
+        continue
+      } 
+
+      group.push(v1)
+
+      finalArray.push([...group])
+      group = []
+    }
+
+
+
+    return finalArray
 }

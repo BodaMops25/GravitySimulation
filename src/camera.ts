@@ -1,5 +1,5 @@
 import { gravityForce, zeroGravitySpeedDistance } from "./game"
-import { _game_params, CanvasHelper, distance, GAME_PARAMS, Vec, vecMagnitude } from "./helpers"
+import { _game_params, CanvasHelper, distance, distance, GAME_PARAMS, metricalIMS, number2avarageGroup, number2MS, Vec, vecMagnitude } from "./helpers"
 import { KeyboardListener } from "./hotkeys"
 import { Particle } from "./particles"
 
@@ -198,33 +198,54 @@ export class Camera {
     size,
     color,
     mode,
-    text
+    textStart,
+    textEnd
   }: {
     pos: Vec,
     posTo: Vec,
     size: {size: number, minSize?: number},
     color?: string | CanvasGradient | CanvasPattern,
     mode?: 'relative' | 'absolute',
-    text?: {
+    textStart?: {
       size: number,
       color?: string | CanvasGradient | CanvasPattern,
       pos?: Vec,
       string: string
-    }
+    },
+    textEnd?: {
+      size: number,
+      color?: string | CanvasGradient | CanvasPattern,
+      pos?: Vec,
+      string: string
+    },
   }) => {
 
+    const cnvsPos = this.map2CameraPos(pos),
+          cnvsPosTo = this.map2CameraPos(mode === 'relative' ? {x: pos.x + posTo.x, y: pos.y + posTo.y} : posTo),
+          dist = distance(cnvsPosTo, cnvsPos)
+
     this.canvasHelper.drawVector({
-      pos: this.map2CameraPos(pos),
-      posTo: this.map2CameraPos(mode === 'relative' ? {x: pos.x + posTo.x, y: pos.y + posTo.y} : posTo),
+      pos: cnvsPos,
+      posTo: cnvsPosTo,
       size: this.map2CameraSize(size.size, size.minSize).value,
+      arrowSize: dist > 5 ? 5 : dist,
       color,
-      text: text !== undefined ? {
-        size: this.map2CameraSize(text.size).value,
-        string: text.string,
-        color: text.color,
-        pos: text.pos !== undefined ? {
-          x: this.map2CameraSize(text.pos.x).value,
-          y: this.map2CameraSize(text.pos.y).value,
+      textStart: textStart !== undefined ? {
+        size: this.map2CameraSize(textStart.size).value,
+        string: textStart.string,
+        color: textStart.color,
+        pos: textStart.pos !== undefined ? {
+          x: this.map2CameraSize(textStart.pos.x).value,
+          y: this.map2CameraSize(textStart.pos.y).value,
+        } : undefined
+      } : undefined,
+      textEnd: textEnd !== undefined ? {
+        size: this.map2CameraSize(textEnd.size).value,
+        string: textEnd.string,
+        color: textEnd.color,
+        pos: textEnd.pos !== undefined ? {
+          x: this.map2CameraSize(textEnd.pos.x).value,
+          y: this.map2CameraSize(textEnd.pos.y).value,
         } : undefined
       } : undefined,
       mode: 'absolute'
@@ -274,6 +295,7 @@ export class Camera {
     }
 
     sessionStorage['focus-body'] = particle.label
+    _game_params.camera.focusBodyGravityPoints = []
   }
   
   removeFocusBody = () => {
@@ -317,7 +339,7 @@ export class Camera {
             y: particle.velocity.y * GAME_PARAMS.simulationSpeed
           }
   
-          this.drawVector({
+          if(particle !== this.focusedBody) this.drawVector({
             pos: particle.pos,
             posTo: realVelocity,
             size: {size: 1, minSize: 2},
@@ -327,27 +349,85 @@ export class Camera {
 
           if(particle === this.focusedBody) {
 
-            for(const velocity of _game_params.camera.focusBodyGravityPoints) {
+            const speed = vecMagnitude(particle.velocity)
 
-              const speed = vecMagnitude(velocity)
-
-              // if(speed < 1) continue
-
-              const velocityAngle = Math.atan2(velocity.y, velocity.x)
-
-              // realVelocityToBody.x = realVelocityToBody.x < particle.radius ? particle.radius : realVelocityToBody.x
-              // realVelocityToBody.y = realVelocityToBody.y < particle.radius ? particle.radius : realVelocityToBody.y
-
-              this.drawVector({
-                pos: particle.pos,
-                posTo: {
-                  x: Math.cos(velocityAngle) * particle.radius,
-                  y: Math.sin(velocityAngle) * particle.radius
-                },
-                size: {size: 1, minSize: 1},
+            this.drawVector({
+              pos: particle.pos,
+              posTo: realVelocity,
+              size: {size: 1, minSize: 2},
+              color: '#fff',
+              mode: 'relative',
+              textEnd: { 
+                size: 20 / this.scale,
+                string: speed.toFixed() + ' m/t',
                 color: '#fff',
-                mode: 'relative'
+                pos: {x: 8 / this.scale, y: -8 / this.scale}
+              }
+            })
+
+            if(_game_params.camera.focusBodyGravityPoints.length > 0) {
+
+              const gravityPoints = _game_params.camera.focusBodyGravityPoints.reduce<{pos: Vec, angle: number, distance: number}[]>((points, velocity) => {
+
+                const distance = vecMagnitude(velocity)
+                if(distance > 1) {
+                  points.push({
+                    pos: velocity,
+                    angle: Math.atan2(velocity.y, velocity.x),
+                    distance: distance
+                  })
+                }
+
+                return points
+              }, [])
+
+              gravityPoints.sort((a, b) => a.angle - b.angle)
+              
+              const groups = number2avarageGroup(gravityPoints.map(item => item.angle), Math.PI/16)
+              const velocities2display = groups.map((group) => {
+                if(typeof group === 'number') {
+                  return gravityPoints.find(point => point.angle === group)?.pos || {x: 0, y: 0}
+                }
+
+                const sumPolVec = group.reduce((vec, angle) => {
+                  const polarVelocity = gravityPoints.find(point => point.angle === angle)
+                  if(polarVelocity) {
+                    vec.distance += polarVelocity.distance
+                    vec.angle += polarVelocity.angle
+                  }
+                  return vec
+                }, {distance: 0, angle: 0})
+
+                sumPolVec.angle /= group.length
+
+                return {
+                  x: Math.cos(sumPolVec.angle) * sumPolVec.distance,
+                  y: Math.sin(sumPolVec.angle) * sumPolVec.distance
+                } 
               })
+
+              for(const velocity of velocities2display) {
+
+                const speed = vecMagnitude(velocity),
+                      velocityAngle = Math.atan2(velocity.y, velocity.x)
+
+                this.drawVector({
+                  pos: particle.pos, 
+                  posTo: {
+                    x: Math.cos(velocityAngle) * 100 / this.scale,
+                    y: Math.sin(velocityAngle) * 100 / this.scale
+                  },
+                  size: {size: 1, minSize: 1},
+                  color: '#fff',
+                  mode: 'relative',
+                  textEnd: { 
+                    size: 20 / this.scale,
+                    string: number2MS(speed, metricalIMS, 'm') + '/t',
+                    color: '#fff',
+                    pos: {x: 8 / this.scale, y: -8 / this.scale}
+                  }
+                })
+              }
             }
           }
         }
