@@ -10,10 +10,9 @@ export function zeroGravitySpeedDistance(bodyMass: number) {
 }
 
 export function applyGravityForce(target: Particle, body: Particle) {
-  if(target === body) return {x: 0, y: 0}
 
   const force = gravityForce(distance(body.pos, target.pos), target.mass, body.mass),
-          angle = angleBetweenVec(body.pos, target.pos),
+          angle = angleBetweenVec(target.pos, body.pos),
           velocity = polar2cartesian(force / target.mass, angle)
 
     target.impulse(velocity)
@@ -21,13 +20,22 @@ export function applyGravityForce(target: Particle, body: Particle) {
 }
 
 export function gravityForceAll(particle: Particle, particles: Particle[]) {
-  return particles.map(particle2 => applyGravityForce(particle, particle2))
+  const arr = []
+
+  for(const particle2 of particles) {
+    if(particle === particle2) continue
+    arr.push(
+      applyGravityForce(particle, particle2)
+    )
+  }
+
+  return arr
 }
 
 export function getOrbitalVelocity(target: Particle, gravityBody: Particle, isAnticlockwise?: boolean) {
   const r = distance(gravityBody.pos, target.pos),
         speed = (GAME_PARAMS.gravity * gravityBody.mass / r)**.5,
-        angle = angleBetweenVec(gravityBody.pos, target.pos),
+        angle = angleBetweenVec(target.pos, gravityBody.pos),
         velocity = polar2cartesian(speed, angle + (isAnticlockwise ? Math.PI/2 : -Math.PI/2))
 
   return velocity

@@ -48,7 +48,7 @@ const loopInterval = getIntervalChangableDelay(() => {
 
   if(GAME_PARAMS.gravityAlgorithmType === 'all') {
     for(const particle of particles) {
-      if(camera.focusedBody) {
+      if(particle === camera.focusedBody) {
         _game_params.camera.focusBodyGravityPoints = gravityForceAll(particle, particles)
         continue
       }
@@ -63,7 +63,7 @@ const loopInterval = getIntervalChangableDelay(() => {
     for(const particle of particles) {
       const gravityPoints = simplifyBodiesForTarget(particle, BHRoot, GAME_PARAMS.barnesHutThreshold).map(item => item.sectors ? item.data : item)
 
-      if(camera.focusedBody) {
+      if(particle === camera.focusedBody) {
         _game_params.camera.focusBodyGravityPoints = gravityForceAll(particle, gravityPoints)
         continue
       }

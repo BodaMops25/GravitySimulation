@@ -331,9 +331,9 @@ export class Camera {
 
               const speed = vecMagnitude(velocity)
 
-              if(speed < 1) continue
+              // if(speed < 1) continue
 
-              const velocityAngle = Math.atan2(velocity.y, velocity.x)*Math.PI
+              const velocityAngle = Math.atan2(velocity.y, velocity.x)
 
               // realVelocityToBody.x = realVelocityToBody.x < particle.radius ? particle.radius : realVelocityToBody.x
               // realVelocityToBody.y = realVelocityToBody.y < particle.radius ? particle.radius : realVelocityToBody.y
@@ -341,8 +341,8 @@ export class Camera {
               this.drawVector({
                 pos: particle.pos,
                 posTo: {
-                  x: Math.cos(velocityAngle) * particle.radius * 128,
-                  y: Math.sin(velocityAngle) * particle.radius * 128
+                  x: Math.cos(velocityAngle) * particle.radius,
+                  y: Math.sin(velocityAngle) * particle.radius
                 },
                 size: {size: 1, minSize: 1},
                 color: '#fff',

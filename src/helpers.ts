@@ -90,7 +90,7 @@ export function distance(pos2: Vec, pos: Vec) {
 }
 
 export function angleBetweenVec(vec2: Vec, vec1: Vec) {
-  return Math.atan2(vec2.y - vec1.y, vec2.x - vec1.x)
+  return Math.atan2(vec1.y - vec2.y, vec1.x - vec2.x)
 }
 
 export function polar2cartesian(magninude: number, angle: number): Vec {
