@@ -19,7 +19,7 @@ export const _game_params: {
       y: number
     },
     focusBodyVelocity: number,
-    focusBodyGravityPoints: Vec[],
+    focusBodyGravityPoints: {angle: number, distance: number}[],
     scale: number
   }
 } = {

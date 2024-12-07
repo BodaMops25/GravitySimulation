@@ -1,4 +1,4 @@
-import { angleBetweenVec, distance, GAME_PARAMS, polar2cartesian, Vec } from "./helpers"
+import { angleBetweenVec, distance, GAME_PARAMS, polar2cartesian, Vec, vecMagnitude } from "./helpers"
 import { Particle } from "./particles"
 
 export function gravityForce(distance: number, mass1: number, mass2: number) {
@@ -9,27 +9,48 @@ export function zeroGravitySpeedDistance(bodyMass: number) {
   return (bodyMass * GAME_PARAMS.gravity * GAME_PARAMS.simulationSpeed)**.5
 }
 
-export function applyGravityForce(target: Particle, body: Particle) {
+export function gravityForce2body(target: Particle, body: Particle) {
 
   const force = gravityForce(distance(body.pos, target.pos), target.mass, body.mass),
           angle = angleBetweenVec(target.pos, body.pos),
           velocity = polar2cartesian(force / target.mass, angle)
 
-    target.impulse(velocity)
-    return velocity
+    return {force, angle, velocity, target, body}
 }
 
-export function gravityForceAll(particle: Particle, particles: Particle[]) {
+export function getAllGravityForces(particle: Particle, particles: Particle[]) {
   const arr = []
-
   for(const particle2 of particles) {
     if(particle === particle2) continue
     arr.push(
-      applyGravityForce(particle, particle2)
+      gravityForce2body(particle, particle2)
     )
   }
-
   return arr
+}
+
+export function getGravityBodies2body(gravityPoinst: {angle: number, velocity: Vec, target: Particle, body: Particle}[], minGravitySpeed = 1) {
+  return gravityPoinst.reduce<{angle: number, distance: number, target: Particle, body: Particle}[]>((arr, force) => {
+    const distance = vecMagnitude(force.velocity) / GAME_PARAMS.simulationSpeed
+    if(distance > minGravitySpeed) arr.push({
+      angle: force.angle,
+      distance: distance,
+      target: force.target,
+      body: force.body
+    })
+    return arr
+  }, [])
+}
+
+export function isBodyOnOrbit(target: Particle, body: Particle, particles: Particle[]) {
+  const forces = getAllGravityForces(target, particles),
+        orbitBody = getGravityBodies2body(forces, 1e-3).find(force => force.body === body)
+  return orbitBody ? true : false
+}
+
+export function getAllOrbitBodies(target: Particle, particles: Particle[]) {
+  const forces = getAllGravityForces(target, particles)
+  return getGravityBodies2body(forces, 1e-3).map(force => force.body)
 }
 
 export function getOrbitalVelocity(target: Particle, gravityBody: Particle, isAnticlockwise?: boolean) {

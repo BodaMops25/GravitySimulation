@@ -1,8 +1,8 @@
-import { _game_params, CanvasHelper, GAME_PARAMS, getIntervalChangableDelay, metricalIMS, number2MS, randomBetween, Vec } from "./helpers"
+import { _game_params, CanvasHelper, distance, GAME_PARAMS, getIntervalChangableDelay, metricalIMS, number2MS, randomBetween, Vec, vecMagnitude } from "./helpers"
 import { Particle } from "./particles"
 import { Camera } from "./camera"
-import { gravityForceAll } from "./game"
-import { createBarnesHutTree, getAreaCorners, simplifyBodiesForTarget } from "./barnes-hun"
+import { getAllGravityForces, getGravityBodies2body } from "./game"
+import { BarnesHutRootType, createBarnesHutTree, getAreaCorners, simplifyBodiesForTarget } from "./barnes-hun"
 import {Pane} from 'tweakpane'
 import * as TweakpaneEssentials from '@tweakpane/plugin-essentials'
 import { KeyboardListener } from "./hotkeys"
@@ -46,31 +46,53 @@ const loopInterval = getIntervalChangableDelay(() => {
 
   for(const particle of particles) particle.move()
 
-  if(GAME_PARAMS.gravityAlgorithmType === 'all') {
-    for(const particle of particles) {
-      if(particle === camera.focusedBody) {
-        _game_params.camera.focusBodyGravityPoints = gravityForceAll(particle, particles)
-        continue
-      }
-      
-      gravityForceAll(particle, particles)
-    }
-  }
-  else if( GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') {
-    const pointsCorners = getAreaCorners(particles),
-        BHRoot = createBarnesHutTree(particles, pointsCorners)
+  let BHRoot: BarnesHutRootType
 
-    for(const particle of particles) {
-      const gravityPoints = simplifyBodiesForTarget(particle, BHRoot, GAME_PARAMS.barnesHutThreshold).map(item => item.sectors ? item.data : item)
-
-      if(particle === camera.focusedBody) {
-        _game_params.camera.focusBodyGravityPoints = gravityForceAll(particle, gravityPoints)
-        continue
-      }
-      
-      gravityForceAll(particle, gravityPoints)
-    }
+  if( GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') {
+    BHRoot = createBarnesHutTree(particles, getAreaCorners(particles))
   }
+
+  for(const particle of particles) {
+
+    let bodies = particles
+    if(GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') bodies = simplifyBodiesForTarget(particle, BHRoot, GAME_PARAMS.barnesHutThreshold).map(item => item.sectors ? item.data : item)
+
+    const gravityForces = getAllGravityForces(particle, bodies)
+
+    if(particle === camera.focusedBody) {
+      _game_params.camera.focusBodyGravityPoints = getGravityBodies2body(gravityForces, 1e-3)
+    }
+
+    gravityForces.forEach(force => particle.impulse(force.velocity))
+  }
+
+  // if(GAME_PARAMS.gravityAlgorithmType === 'all') {
+  //   for(const particle of particles) {
+
+  //     const gravityForces = getAllGravityForces(particle, particles)
+
+  //     if(particle === camera.focusedBody) {
+  //       _game_params.camera.focusBodyGravityPoints = gravityForces.map(force => ({angle: force.angle, distance: vecMagnitude(force.velocity)}))
+  //     }
+      
+  //     gravityForces.forEach(force => particle.impulse(force.velocity))
+  //   }
+  // }
+  // else if( GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') {
+  //   const pointsCorners = getAreaCorners(particles),
+  //         BHRoot = createBarnesHutTree(particles, pointsCorners)
+
+  //   for(const particle of particles) {
+  //     const gravityPoints = simplifyBodiesForTarget(particle, BHRoot, GAME_PARAMS.barnesHutThreshold).map(item => item.sectors ? item.data : item)
+  //     const gravityForces = getAllGravityForces(particle, gravityPoints)
+
+  //     if(particle === camera.focusedBody) {
+  //       _game_params.camera.focusBodyGravityPoints = gravityForces.map(force => ({angle: force.angle, distance: vecMagnitude(force.velocity)}))
+  //     }
+      
+  //     gravityForces.forEach(force => particle.impulse(force.velocity))
+  //   }
+  // }
 
   // for(const particle of particles) particle.move()
 

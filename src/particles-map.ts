@@ -53,7 +53,7 @@ moon = new Particle({
 
 particlesMap.push(sun, earth, moon, mars, mercury, venus)
 
-for(let i = 0; i < 600; i++) {
+for(let i = 0; i < 100; i++) {
   const p = new Particle({
     pos: {x: randomBetween(-255e9, 255e9), y: randomBetween(-1e10, 1e10)},
     mass: 1e20,

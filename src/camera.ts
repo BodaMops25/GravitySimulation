@@ -367,26 +367,12 @@ export class Camera {
 
             if(_game_params.camera.focusBodyGravityPoints.length > 0) {
 
-              const gravityPoints = _game_params.camera.focusBodyGravityPoints.reduce<{pos: Vec, angle: number, distance: number}[]>((points, velocity) => {
-
-                const distance = vecMagnitude(velocity)
-                if(distance > 1) {
-                  points.push({
-                    pos: velocity,
-                    angle: Math.atan2(velocity.y, velocity.x),
-                    distance: distance
-                  })
-                }
-
-                return points
-              }, [])
-
-              gravityPoints.sort((a, b) => a.angle - b.angle)
+              const gravityPoints = _game_params.camera.focusBodyGravityPoints.sort((a, b) => a.angle - b.angle)
               
               const groups = number2avarageGroup(gravityPoints.map(item => item.angle), Math.PI/16)
-              const velocities2display = groups.map((group) => {
+              const polarVelocities2display = groups.map((group) => {
                 if(typeof group === 'number') {
-                  return gravityPoints.find(point => point.angle === group)?.pos || {x: 0, y: 0}
+                  return gravityPoints.find(point => point.angle === group)
                 }
 
                 const sumPolVec = group.reduce((vec, angle) => {
@@ -400,29 +386,23 @@ export class Camera {
 
                 sumPolVec.angle /= group.length
 
-                return {
-                  x: Math.cos(sumPolVec.angle) * sumPolVec.distance,
-                  y: Math.sin(sumPolVec.angle) * sumPolVec.distance
-                } 
-              })
+                return sumPolVec
+              }) as {angle: number, distance: number}[]
 
-              for(const velocity of velocities2display) {
-
-                const speed = vecMagnitude(velocity),
-                      velocityAngle = Math.atan2(velocity.y, velocity.x)
+              for(const velocity of polarVelocities2display) {
 
                 this.drawVector({
                   pos: particle.pos, 
                   posTo: {
-                    x: Math.cos(velocityAngle) * 100 / this.scale,
-                    y: Math.sin(velocityAngle) * 100 / this.scale
+                    x: Math.cos(velocity.angle) * 100 / this.scale,
+                    y: Math.sin(velocity.angle) * 100 / this.scale
                   },
                   size: {size: 1, minSize: 1},
                   color: '#fff',
                   mode: 'relative',
                   textEnd: { 
                     size: 20 / this.scale,
-                    string: number2MS(speed, metricalIMS, 'm') + '/t',
+                    string: number2MS(velocity.distance, metricalIMS, 'm') + '/t',
                     color: '#fff',
                     pos: {x: 8 / this.scale, y: -8 / this.scale}
                   }
