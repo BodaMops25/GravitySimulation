@@ -1,40 +1,28 @@
+import { _game_params_type, CanvasColor, PhisMarks, PolarVec, Vec } from "./types"
+
 export const GAME_PARAMS = {
   simulationSpeed: 3600 * 6,
   gravity: 6.674 * 1e-11,
   AU: 150e9,
   tps: 65,
   fps: 65,
-  gravityAlgorithmType: 'barnes-hut', // 'all', 'barnes-hut'
+  gravityAlgorithmType: 'all', // 'all', 'barnes-hut'
   barnesHutThreshold: 1, // working only with gravityAlgorithmType: 'barnes-hut', less value == more comparison => less performance
   mapBodyMinSize: 3,
   mapBodyCircleOffset: 2,
+  minCountedGravityVeclocity: 1e-3
 }
 
-window.GAME_PARAMS = GAME_PARAMS
-
-export const _game_params: {
+export const _game_params: _game_params_type = {
   camera: {
-    pos: {
-      x: number,
-      y: number
-    },
-    focusBodyVelocity: number,
-    focusBodyGravityPoints: {angle: number, distance: number}[],
-    scale: number
-  }
-} = {
-  camera: {
-    pos: {
-      x: 0,
-      y: 0
-    },
+    pos: {x: 0, y: 0},
     focusBodyVelocity: 0,
     focusBodyGravityPoints: [],
     scale: 9e-10
   },
 }
 
-export const metricalIMS = [
+export const metricalIMS: PhisMarks[] = [
   {exp: -6, mark: 'mk'},
   {exp: -3, mark: 'm'},
   {exp: 0, mark: 'm'},
@@ -43,7 +31,7 @@ export const metricalIMS = [
   {exp: 9, mark: 'G'},
 ]
 
-export function number2MS(number: number, marks: {exp: number, mark: string}[], zeroMark: string, digits = 0) {
+export function number2MS(number: number, marks: PhisMarks[], zeroMark: string, digits = 0) {
   const isNegative = number < 0
 
   if(isNegative) number *= -1
@@ -93,10 +81,10 @@ export function angleBetweenVec(vec2: Vec, vec1: Vec) {
   return Math.atan2(vec1.y - vec2.y, vec1.x - vec2.x)
 }
 
-export function polar2cartesian(magninude: number, angle: number): Vec {
+export function polar2cartesian(vec: PolarVec): Vec {
   return {
-    x: Math.cos(angle) * magninude,
-    y: Math.sin(angle) * magninude
+    x: Math.cos(vec.angle) * vec.magnitude,
+    y: Math.sin(vec.angle) * vec.magnitude
   }
 }
 
@@ -163,9 +151,9 @@ export class CanvasHelper {
   }: {
     pos: Vec,
     scale: number,
-    color?: string | CanvasGradient | CanvasPattern,
+    color?: CanvasColor,
     strokeScale?: number,
-    strokeColor?: string | CanvasGradient | CanvasPattern
+    strokeColor?: CanvasColor
   }) => {
     if(!this.ctx) {
       console.warn('No canvas context2D!')
@@ -181,8 +169,8 @@ export class CanvasHelper {
     }
 
     if(strokeScale || strokeColor) {
-      this.ctx.lineWidth = strokeScale || scale / 10
-      this.ctx.strokeStyle = strokeColor || '#000'
+      this.ctx.lineWidth = strokeScale ?? scale / 10
+      this.ctx.strokeStyle = strokeColor ?? '#000'
       this.ctx.stroke()
     }
   }
@@ -201,17 +189,17 @@ export class CanvasHelper {
     posTo: Vec,
     size?: number,
     arrowSize?: number,
-    color?: string | CanvasGradient | CanvasPattern,
+    color?: CanvasColor,
     mode?: 'relative' | 'absolute'
     textStart?: {
       size: number,
-      color?: string | CanvasGradient | CanvasPattern,
+      color?: CanvasColor,
       pos?: Vec,
       string: string
     },
     textEnd?: {
       size: number,
-      color?: string | CanvasGradient | CanvasPattern,
+      color?: CanvasColor,
       pos?: Vec,
       string: string
     },
@@ -300,11 +288,6 @@ export class CanvasHelper {
   }
 }
 
-export type Vec = {
-  x: number,
-  y: number
-} 
-
 export function findPaneChildByLable(paneObj: any, label: string, deep = 0) {
   if(deep > 1000) {
     console.warn('Too much recursion!')
@@ -346,3 +329,5 @@ export function number2avarageGroup(arr: number[], threshold: number) {
 
     return finalArray
 }
+
+window.GAME_PARAMS = GAME_PARAMS

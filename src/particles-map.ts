@@ -1,4 +1,4 @@
-import { getOrbitalVelocity, setSatellite2Body } from "./game"
+import { getOrbitalVelocity, minGravitySpeedDistance, setSatellite2Body } from "./game"
 import { GAME_PARAMS, randomBetween } from "./helpers"
 import { Particle } from "./particles"
 
@@ -43,23 +43,25 @@ venus = new Particle({
   label: 'venus'
 }),
 moon = new Particle({
-  pos: {x: GAME_PARAMS.AU + 380e6, y: 0},
+  // pos: {x: GAME_PARAMS.AU - minGravitySpeedDistance(earth.mass)/* 380e6 */, y: 0},
   mass: 7e22,
-  velocity: {x: 0, y: 30e3 + 1000},
+  // velocity: {x: 0, y: 30e3 + 1000},
   color: 'gray',
   radius: 1.7e6,
   label: 'moon'
 })
 
+setSatellite2Body(moon, earth, 380e6, 0)
+moon.velocity.y += 1000
+
 particlesMap.push(sun, earth, moon, mars, mercury, venus)
 
-for(let i = 0; i < 100; i++) {
+for(let i = 0; i < 200; i++) {
   const p = new Particle({
     pos: {x: randomBetween(-255e9, 255e9), y: randomBetween(-1e10, 1e10)},
     mass: 1e20,
     color: 'purple',
-    radius: 1e3,
-    label: (+new Date() * Math.random()).toFixed(0)
+    radius: 1e3
   })
 
   p.velocity = getOrbitalVelocity(p, sun)
@@ -68,6 +70,18 @@ for(let i = 0; i < 100; i++) {
   p.velocity.x *= randomBetween(1-tmp, 1+tmp)
   p.velocity.y *= randomBetween(1-tmp, 1+tmp)
 
+  particlesMap.push(p)
+}
+
+for(let i = 1; i < 10; i++) {
+  const p = new Particle({
+    mass: 1e6,
+    radius: 1e3,
+    color: 'blue',
+    label: 'earth_sattelites_extras_' + i
+  })
+
+  setSatellite2Body(p, earth, i/9 * minGravitySpeedDistance(earth.mass), 0, true)
   particlesMap.push(p)
 }
 

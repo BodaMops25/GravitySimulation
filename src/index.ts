@@ -1,4 +1,4 @@
-import { _game_params, CanvasHelper, distance, GAME_PARAMS, getIntervalChangableDelay, metricalIMS, number2MS, randomBetween, Vec, vecMagnitude } from "./helpers"
+import { _game_params, CanvasHelper, GAME_PARAMS, getIntervalChangableDelay, metricalIMS, number2MS } from "./helpers"
 import { Particle } from "./particles"
 import { Camera } from "./camera"
 import { getAllGravityForces, getGravityBodies2body } from "./game"
@@ -6,7 +6,7 @@ import { BarnesHutRootType, createBarnesHutTree, getAreaCorners, simplifyBodiesF
 import {Pane} from 'tweakpane'
 import * as TweakpaneEssentials from '@tweakpane/plugin-essentials'
 import { KeyboardListener } from "./hotkeys"
-import particlesMap from "./particles-map"
+import { Vec } from "./types"
 
 // ---- SETTINGS ----
 
@@ -55,46 +55,16 @@ const loopInterval = getIntervalChangableDelay(() => {
   for(const particle of particles) {
 
     let bodies = particles
-    if(GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') bodies = simplifyBodiesForTarget(particle, BHRoot, GAME_PARAMS.barnesHutThreshold).map(item => item.sectors ? item.data : item)
+    if(GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') bodies = simplifyBodiesForTarget(particle, BHRoot, GAME_PARAMS.barnesHutThreshold) as any
 
     const gravityForces = getAllGravityForces(particle, bodies)
 
     if(particle === camera.focusedBody) {
-      _game_params.camera.focusBodyGravityPoints = getGravityBodies2body(gravityForces, 1e-3)
+      _game_params.camera.focusBodyGravityPoints = getGravityBodies2body(gravityForces, GAME_PARAMS.minCountedGravityVeclocity)
     }
 
     gravityForces.forEach(force => particle.impulse(force.velocity))
   }
-
-  // if(GAME_PARAMS.gravityAlgorithmType === 'all') {
-  //   for(const particle of particles) {
-
-  //     const gravityForces = getAllGravityForces(particle, particles)
-
-  //     if(particle === camera.focusedBody) {
-  //       _game_params.camera.focusBodyGravityPoints = gravityForces.map(force => ({angle: force.angle, distance: vecMagnitude(force.velocity)}))
-  //     }
-      
-  //     gravityForces.forEach(force => particle.impulse(force.velocity))
-  //   }
-  // }
-  // else if( GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') {
-  //   const pointsCorners = getAreaCorners(particles),
-  //         BHRoot = createBarnesHutTree(particles, pointsCorners)
-
-  //   for(const particle of particles) {
-  //     const gravityPoints = simplifyBodiesForTarget(particle, BHRoot, GAME_PARAMS.barnesHutThreshold).map(item => item.sectors ? item.data : item)
-  //     const gravityForces = getAllGravityForces(particle, gravityPoints)
-
-  //     if(particle === camera.focusedBody) {
-  //       _game_params.camera.focusBodyGravityPoints = gravityForces.map(force => ({angle: force.angle, distance: vecMagnitude(force.velocity)}))
-  //     }
-      
-  //     gravityForces.forEach(force => particle.impulse(force.velocity))
-  //   }
-  // }
-
-  // for(const particle of particles) particle.move()
 
   frameRate.tpsgraph.end()
 })
@@ -113,6 +83,7 @@ simulationSettingsFolder.addBinding(GAME_PARAMS, 'fps', {min: 0, max: 1000, step
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'simulationSpeed', {step: 1})
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'gravity', {format: (value: number) => value.toExponential()})
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'AU', {format: (value: number) => value.toExponential()})
+simulationSettingsFolder.addBinding(GAME_PARAMS, 'minCountedGravityVeclocity', {format: (value: number) => value.toExponential(), label: 'minGravity'})
 
 cameraSettingsFolder.addBinding(_game_params.camera, 'pos', {
   label: 'pos',
@@ -144,11 +115,14 @@ camera.bodyVelocityPanes = {
 
 if(sessionStorage['gameSettings'] !== undefined) pane.importState(JSON.parse(sessionStorage['gameSettings']))
 
-particlesMap.forEach(particle => particles.push(particle))
-if(sessionStorage['focus-body']) {
-  const body = particles.find(particle => particle.label === sessionStorage['focus-body'])
-  if(body) camera.focusBody(body)
-}
+import("./particles-map")
+  .then((module) => {
+    module.default.forEach(particle => particles.push(particle))
+    if(sessionStorage['focus-body']) {
+      const body = particles.find(particle => particle.label === sessionStorage['focus-body'])
+      if(body) camera.focusBody(body)
+    }
+  })
 
 loopInterval(1000 / GAME_PARAMS.tps)
 renderInterval(1000 / GAME_PARAMS.fps)
@@ -160,50 +134,3 @@ window.particles = particles
 window.canvasHelper = canvasHelper
 window.camera = camera
 window.keyboardHandler = keyboardHandler
-
-/* cameraSettingsFolder.addBlade({
-  order: -1,
-  view: 'list',
-  label: 'focusBody',
-  options: [
-    {text: 'none', value: 'none'},
-    {text: 'sun', value: 'sun'},
-    {text: 'earth', value: 'earth'},
-    {text: 'moon', value: 'moon'},
-    {text: 'mars', value: 'mars'},
-    {text: 'mercury', value: 'mercury'},
-    {text: 'venus', value: 'venus'},
-  ],
-  value: 'none',
-}).on('change', ({value: body}: {value: string}) => {
-  switch(body) {
-    case 'none':
-      camera.removeFocusBody()
-      bodyVelocityViews.number.hidden = true
-      bodyVelocityViews.graph.hidden = true
-      break;
-    case 'sun':
-      camera.focusBody(sun)
-      break;
-    case 'earth':
-      camera.focusBody(earth)
-      break;
-    case 'moon':
-      camera.focusBody(moon)
-      break;
-    case 'mars':
-      camera.focusBody(mars)
-      break;
-    case 'mercury':
-      camera.focusBody(mercury)
-      break;
-    case 'venus':
-      camera.focusBody(venus)
-      break;
-  }
-
-  if(body !== 'none') {
-    bodyVelocityViews.number.hidden = false
-    bodyVelocityViews.graph.hidden = false
-  }
-}) */

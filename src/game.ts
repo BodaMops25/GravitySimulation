@@ -1,19 +1,22 @@
-import { angleBetweenVec, distance, GAME_PARAMS, polar2cartesian, Vec, vecMagnitude } from "./helpers"
+import { angleBetweenVec, distance, GAME_PARAMS, polar2cartesian, vecMagnitude } from "./helpers"
 import { Particle } from "./particles"
+import { Vec } from "./types"
 
 export function gravityForce(distance: number, mass1: number, mass2: number) {
   return mass1 * mass2 / distance**2 * GAME_PARAMS.gravity * GAME_PARAMS.simulationSpeed
 }
 
-export function zeroGravitySpeedDistance(bodyMass: number) {
-  return (bodyMass * GAME_PARAMS.gravity * GAME_PARAMS.simulationSpeed)**.5
+export function minGravitySpeedDistance(bodyMass: number) {
+  return (bodyMass * (1/GAME_PARAMS.minCountedGravityVeclocity) * GAME_PARAMS.gravity)**.5
 }
+
+// GAME_PARAMS.minCountedGravityVeclocity
 
 export function gravityForce2body(target: Particle, body: Particle) {
 
   const force = gravityForce(distance(body.pos, target.pos), target.mass, body.mass),
           angle = angleBetweenVec(target.pos, body.pos),
-          velocity = polar2cartesian(force / target.mass, angle)
+          velocity = polar2cartesian({magnitude: force / target.mass, angle})
 
     return {force, angle, velocity, target, body}
 }
@@ -30,11 +33,11 @@ export function getAllGravityForces(particle: Particle, particles: Particle[]) {
 }
 
 export function getGravityBodies2body(gravityPoinst: {angle: number, velocity: Vec, target: Particle, body: Particle}[], minGravitySpeed = 1) {
-  return gravityPoinst.reduce<{angle: number, distance: number, target: Particle, body: Particle}[]>((arr, force) => {
-    const distance = vecMagnitude(force.velocity) / GAME_PARAMS.simulationSpeed
-    if(distance > minGravitySpeed) arr.push({
+  return gravityPoinst.reduce<{angle: number, magnitude: number, target: Particle, body: Particle}[]>((arr, force) => {
+    const magnitude = vecMagnitude(force.velocity) / GAME_PARAMS.simulationSpeed
+    if(magnitude > minGravitySpeed) arr.push({
       angle: force.angle,
-      distance: distance,
+      magnitude,
       target: force.target,
       body: force.body
     })
@@ -44,33 +47,38 @@ export function getGravityBodies2body(gravityPoinst: {angle: number, velocity: V
 
 export function isBodyOnOrbit(target: Particle, body: Particle, particles: Particle[]) {
   const forces = getAllGravityForces(target, particles),
-        orbitBody = getGravityBodies2body(forces, 1e-3).find(force => force.body === body)
+        orbitBody = getGravityBodies2body(forces, GAME_PARAMS.minCountedGravityVeclocity).find(force => force.body === body)
   return orbitBody ? true : false
 }
 
 export function getAllOrbitBodies(target: Particle, particles: Particle[]) {
   const forces = getAllGravityForces(target, particles)
-  return getGravityBodies2body(forces, 1e-3).map(force => force.body)
+  return getGravityBodies2body(forces, GAME_PARAMS.minCountedGravityVeclocity).map(force => force.body)
 }
 
 export function getOrbitalVelocity(target: Particle, gravityBody: Particle, isAnticlockwise?: boolean) {
   const r = distance(gravityBody.pos, target.pos),
         speed = (GAME_PARAMS.gravity * gravityBody.mass / r)**.5,
         angle = angleBetweenVec(target.pos, gravityBody.pos),
-        velocity = polar2cartesian(speed, angle + (isAnticlockwise ? Math.PI/2 : -Math.PI/2))
+        velocity = polar2cartesian({magnitude: speed, angle: angle + (isAnticlockwise ? Math.PI/2 : -Math.PI/2)})
 
   return velocity
 }
 
-export function setSatellite2Body(target: Particle, body: Particle, height: number, angle: number, isOrbital?: boolean) {
-  const pos = polar2cartesian(height, angle/180*Math.PI)
+export function setSatellite2Body(target: Particle, body: Particle, height: number, angle: number, isOrbital?: boolean, isAntyclockwise?: boolean) {
+  const pos = polar2cartesian({magnitude: height, angle: angle/180*Math.PI})
 
   target.pos.x = body.pos.x + pos.x
   target.pos.y = body.pos.y + pos.y
 
+  target.velocity.x = body.velocity.x
+  target.velocity.y = body.velocity.y
+
   if(isOrbital) {
-    const orbitalVelocity = getOrbitalVelocity(target, body)
+    const orbitalVelocity = getOrbitalVelocity(target, body, isAntyclockwise)
     target.velocity.x = body.velocity.x + orbitalVelocity.x
     target.velocity.y = body.velocity.y + orbitalVelocity.y
   }
 }
+
+window.zeroGravitySpeedDistance = minGravitySpeedDistance

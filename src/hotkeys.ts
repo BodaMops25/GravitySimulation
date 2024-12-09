@@ -1,4 +1,5 @@
-import { GAME_PARAMS, Vec } from "./helpers"
+import { GAME_PARAMS } from "./helpers"
+import { Vec } from "./types"
 
 type KeyboardKey = 
     'Space' | 'KeyF'

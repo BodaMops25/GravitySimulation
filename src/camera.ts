@@ -1,7 +1,9 @@
-import { gravityForce, zeroGravitySpeedDistance } from "./game"
-import { _game_params, CanvasHelper, distance, distance, GAME_PARAMS, metricalIMS, number2avarageGroup, number2MS, Vec, vecMagnitude } from "./helpers"
+import { createBarnesHutTree, simplifyBodiesForTarget } from "./barnes-hun"
+import { getAllGravityForces, getGravityBodies2body, minGravitySpeedDistance } from "./game"
+import { _game_params, CanvasHelper, distance, GAME_PARAMS, metricalIMS, number2avarageGroup, number2MS, vecMagnitude } from "./helpers"
 import { KeyboardListener } from "./hotkeys"
 import { Particle } from "./particles"
+import { CanvasColor, PolarVec, Vec } from "./types"
 
 type CameraConstructor = {
   particles: Particle[],
@@ -177,7 +179,7 @@ export class Camera {
     return true
   }
 
-  drawForceField = (pos: Vec, radius: number, hexColor: string, func: (x: number) => number, steps?: number) => {
+  drawRadialGradient = (pos: Vec, radius: number, hexColor: string, func: (x: number) => number, steps?: number) => {
     const canvasPos = this.map2CameraPos(pos),
           size = this.map2CameraSize(radius).value
 
@@ -204,17 +206,17 @@ export class Camera {
     pos: Vec,
     posTo: Vec,
     size: {size: number, minSize?: number},
-    color?: string | CanvasGradient | CanvasPattern,
+    color?: CanvasColor,
     mode?: 'relative' | 'absolute',
     textStart?: {
       size: number,
-      color?: string | CanvasGradient | CanvasPattern,
+      color?: CanvasColor,
       pos?: Vec,
       string: string
     },
     textEnd?: {
       size: number,
-      color?: string | CanvasGradient | CanvasPattern,
+      color?: CanvasColor,
       pos?: Vec,
       string: string
     },
@@ -287,15 +289,24 @@ export class Camera {
   focusBody = (particle: Particle) => {
     this.focusedBody = particle
     this.setPos({x: 0, y: 0}, 'relative')
-    if(this.bodyVelocityPanes && this.bodyVelocityPanes.number) {
+    if(this.bodyVelocityPanes?.number) {
       this.bodyVelocityPanes.number.hidden = false
     }
-    if(this.bodyVelocityPanes && this.bodyVelocityPanes.graph) {
+    if(this.bodyVelocityPanes?.graph) {
       this.bodyVelocityPanes.graph.hidden = false
     }
 
     sessionStorage['focus-body'] = particle.label
-    _game_params.camera.focusBodyGravityPoints = []
+
+    let bodies = this.particles
+
+    if(GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') {
+      const BHRoot = createBarnesHutTree(this.particles)
+      bodies = simplifyBodiesForTarget(this.focusedBody, BHRoot, GAME_PARAMS.barnesHutThreshold) as any
+    }
+
+    const forces = getAllGravityForces(this.focusedBody, bodies)
+    _game_params.camera.focusBodyGravityPoints = getGravityBodies2body(forces, GAME_PARAMS.minCountedGravityVeclocity)
   }
   
   removeFocusBody = () => {
@@ -304,10 +315,10 @@ export class Camera {
     this.setPos(coords, 'absolute')
     _game_params.camera.focusBodyVelocity = 0
 
-    if(this.bodyVelocityPanes && this.bodyVelocityPanes.number) {
+    if(this.bodyVelocityPanes?.number) {
       this.bodyVelocityPanes.number.hidden = true
     }
-    if(this.bodyVelocityPanes && this.bodyVelocityPanes.graph) {
+    if(this.bodyVelocityPanes?.graph) {
       this.bodyVelocityPanes.graph.hidden = true
     }
 
@@ -346,10 +357,12 @@ export class Camera {
             color: '#fff',
             mode: 'relative'
           })
+          else {
 
-          if(particle === this.focusedBody) {
-
-            const speed = vecMagnitude(particle.velocity)
+            const speed = vecMagnitude(particle.velocity),
+                  bodyCnvsPos = this.map2CameraPos(particle.pos),
+                  gravityDistance = minGravitySpeedDistance(this.focusedBody.mass),
+                  cnvsGravityDistance = this.map2CameraSize(gravityDistance)
 
             this.drawVector({
               pos: particle.pos,
@@ -365,6 +378,20 @@ export class Camera {
               }
             })
 
+            this.drawRadialGradient(
+              particle.pos,
+              gravityDistance,
+              '#ffffff',
+              x => x**.25, 128
+            )
+
+            this.canvasHelper.drawBall({
+              pos: bodyCnvsPos,
+              scale: cnvsGravityDistance.value,
+              strokeScale: 1,
+              strokeColor: '#fff'
+            })
+
             if(_game_params.camera.focusBodyGravityPoints.length > 0) {
 
               const gravityPoints = _game_params.camera.focusBodyGravityPoints.sort((a, b) => a.angle - b.angle)
@@ -378,16 +405,16 @@ export class Camera {
                 const sumPolVec = group.reduce((vec, angle) => {
                   const polarVelocity = gravityPoints.find(point => point.angle === angle)
                   if(polarVelocity) {
-                    vec.distance += polarVelocity.distance
+                    vec.magnitude += polarVelocity.magnitude
                     vec.angle += polarVelocity.angle
                   }
                   return vec
-                }, {distance: 0, angle: 0})
+                }, {magnitude: 0, angle: 0})
 
                 sumPolVec.angle /= group.length
 
                 return sumPolVec
-              }) as {angle: number, distance: number}[]
+              }) as PolarVec[]
 
               for(const velocity of polarVelocities2display) {
 
@@ -402,7 +429,7 @@ export class Camera {
                   mode: 'relative',
                   textEnd: { 
                     size: 20 / this.scale,
-                    string: number2MS(velocity.distance, metricalIMS, 'm') + '/t',
+                    string: number2MS(velocity.magnitude, metricalIMS, 'm') + '/t',
                     color: '#fff',
                     pos: {x: 8 / this.scale, y: -8 / this.scale}
                   }
