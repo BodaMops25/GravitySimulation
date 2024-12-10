@@ -67,7 +67,7 @@ for(let i = 0; i < 200; i++) {
   p.velocity = getOrbitalVelocity(p, sun)
 
   const tmp = .05
-  p.velocity.x *= randomBetween(1-tmp, 1+tmp)
+  p.velocity.x *= randomBetween(1-tmp, 1+tmp) 
   p.velocity.y *= randomBetween(1-tmp, 1+tmp)
 
   particlesMap.push(p)
@@ -81,7 +81,19 @@ for(let i = 1; i < 10; i++) {
     label: 'earth_sattelites_extras_' + i
   })
 
-  setSatellite2Body(p, earth, i/9 * minGravitySpeedDistance(earth.mass), 0, true)
+  setSatellite2Body(p, earth, i/18 * minGravitySpeedDistance(earth.mass), 90, true)
+  particlesMap.push(p)
+}
+
+for(let i = 0; i < 3; i++) {
+  const p = new Particle({
+    mass: 1e6,
+    radius: 1e3,
+    color: 'red',
+    label: 'earth_sattelites3_extras_' + i
+  })
+
+  setSatellite2Body(p, earth, 380e6, 360/3*i+60, true)
   particlesMap.push(p)
 }
 

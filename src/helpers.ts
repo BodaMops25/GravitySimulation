@@ -6,7 +6,7 @@ export const GAME_PARAMS = {
   AU: 150e9,
   tps: 65,
   fps: 65,
-  gravityAlgorithmType: 'all', // 'all', 'barnes-hut'
+  gravityAlgorithmType: 'barnes-hut', // 'all', 'barnes-hut'
   barnesHutThreshold: 1, // working only with gravityAlgorithmType: 'barnes-hut', less value == more comparison => less performance
   mapBodyMinSize: 3,
   mapBodyCircleOffset: 2,
@@ -23,12 +23,18 @@ export const _game_params: _game_params_type = {
 }
 
 export const metricalIMS: PhisMarks[] = [
-  {exp: -6, mark: 'mk'},
+  {exp: -15, mark: 'f'},
+  {exp: -12, mark: 'p'},
+  {exp: -9, mark: 'n'},
+  {exp: -6, mark: 'μ'},
   {exp: -3, mark: 'm'},
   {exp: 0, mark: 'm'},
   {exp: 3, mark: 'k'},
   {exp: 6, mark: 'M'},
   {exp: 9, mark: 'G'},
+  {exp: 12, mark: 'T'},
+  {exp: 15, mark: 'P'},
+  {exp: 18, mark: 'E'},
 ]
 
 export function number2MS(number: number, marks: PhisMarks[], zeroMark: string, digits = 0) {

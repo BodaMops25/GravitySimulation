@@ -1,4 +1,4 @@
-import { _game_params, CanvasHelper, GAME_PARAMS, getIntervalChangableDelay, metricalIMS, number2MS } from "./helpers"
+import { _game_params, CanvasHelper, GAME_PARAMS, getIntervalChangableDelay, metricalIMS, number2MS, vecMagnitude } from "./helpers"
 import { Particle } from "./particles"
 import { Camera } from "./camera"
 import { getAllGravityForces, getGravityBodies2body } from "./game"
@@ -36,6 +36,8 @@ const particles: Particle[] = [],
       keyboardHandler = new KeyboardListener({tweakpane: pane}),
       camera = new Camera({particles, canvasHelper, tweakpane: pane, keyboardHandler})
 
+keyboardHandler.camera = camera
+
 const frameRate = {
   tpsgraph: simulationSettingsFolder.addBlade({view: 'fpsgraph', label: 'TPS'}),
   fpsgraph: simulationSettingsFolder.addBlade({view: 'fpsgraph', label: 'FPS'})
@@ -72,7 +74,7 @@ const loopInterval = getIntervalChangableDelay(() => {
 const renderInterval = getIntervalChangableDelay(() => {
   frameRate.fpsgraph.begin()
   canvasHelper.ctx?.clearRect(0, 0, canvas.width, canvas.height)
-  camera.render({debug: true})
+  camera.render({debug: false})
   camera.canvasHelper.drawCursor()
   frameRate.fpsgraph.end()
 })
@@ -93,7 +95,7 @@ cameraSettingsFolder.addBinding(_game_params.camera, 'pos', {
 }).on('change', ({last, value: pos}: {last: boolean, value: Vec}) => {
   if(last) camera.setPos(pos, 'relative')
 })
-cameraSettingsFolder.addBinding(_game_params.camera, 'scale', {format: (value: number) => value.toExponential()})
+cameraSettingsFolder.addBinding(_game_params.camera, 'scale', {format: (value: number) => number2MS(1 / value * camera.canvasHelper.canvas.width, metricalIMS, 'm', 3)})
   .on('change', ({last, value}: {last: boolean, value: number}) => {
     if(last) camera.scale = value
   })

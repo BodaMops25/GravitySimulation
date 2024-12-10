@@ -1,7 +1,6 @@
 import { createBarnesHutTree, simplifyBodiesForTarget } from "./barnes-hun"
 import { getAllGravityForces, getGravityBodies2body, minGravitySpeedDistance } from "./game"
 import { _game_params, CanvasHelper, distance, GAME_PARAMS, metricalIMS, number2avarageGroup, number2MS, vecMagnitude } from "./helpers"
-import { KeyboardListener } from "./hotkeys"
 import { Particle } from "./particles"
 import { CanvasColor, PolarVec, Vec } from "./types"
 
@@ -12,7 +11,6 @@ type CameraConstructor = {
   focusedBody?: Particle,
   canvasHelper: CanvasHelper,
   tweakpane?: any,
-  keyboardHandler?: KeyboardListener,
   bodyVelocityPanes?: {
     number?: any
     graph?: any
@@ -31,17 +29,13 @@ export class Camera {
   particles: Particle[]
   canvasHelper: CanvasHelper
   tweakpane?: any
-  keyboardHandler?: KeyboardListener
   bodyVelocityPanes?: {
     number?: any
     graph?: any
   }
   focusedBody?: Particle
-  mousemove: boolean
-  lastPos: Vec
-  anchored: Vec
 
-  constructor({particles, pos = {x: 0, y: 0}, scale = 1, focusedBody, canvasHelper, tweakpane, keyboardHandler, bodyVelocityPanes}: CameraConstructor) {
+  constructor({particles, pos = {x: 0, y: 0}, scale = 1, focusedBody, canvasHelper, tweakpane, bodyVelocityPanes}: CameraConstructor) {
     
     this._pos = {...pos}
 
@@ -49,47 +43,8 @@ export class Camera {
     this.particles = particles
     this.canvasHelper = canvasHelper
     this.tweakpane = tweakpane
-    this.keyboardHandler = keyboardHandler
     this.bodyVelocityPanes = bodyVelocityPanes
     this.focusedBody = focusedBody
-
-    this.mousemove = false
-    this.lastPos = {x: 0, y: 0}
-    this.anchored = {x: 0, y: 0}
-
-    document.body.addEventListener("wheel", event => {
-      if(event.deltaY > 0) this.scale /= 2
-      else if(event.deltaY < 0) this.scale *= 2
-    })
-  
-    document.body.addEventListener("mousedown", event => {
-      if(event.button !== 1) return
-
-      this.mousemove = true
-  
-      this.lastPos.x = event.clientX
-      this.lastPos.y = event.clientY
-
-      this.anchored = this.getPos('relative')
-    })
-  
-    document.body.addEventListener("mousemove", event => {
-      if(this.mousemove === false) return
-      
-      const delta_x = event.clientX - this.lastPos.x,
-            delta_y = event.clientY - this.lastPos.y
-
-      this.setPos({
-        x: this.anchored.x - delta_x / this.scale,
-        y: this.anchored.y - delta_y / this.scale
-      }, 'relative')
-    })
-
-    document.body.addEventListener("mouseup", event => {
-      if(event.button !== 1) return
-
-      this.mousemove = false
-    })
   }
 
   getPos = (type: 'absolute' | 'relative'): Vec => {
@@ -331,17 +286,6 @@ export class Camera {
 
       const particleDrawn = this.drawBody(particle)
 
-      if(this.keyboardHandler) {
-        if(this.keyboardHandler.focus_body_request && particleDrawn) {
-          if(
-            distance(this.keyboardHandler.mouse_pos, particleDrawn.pos) < particleDrawn.size
-          ) {
-            this.focusBody(particle)
-            this.keyboardHandler.focus_body_request = false
-          }
-        }
-      }
-
       if(debug) {
 
         if(particleDrawn) {
@@ -364,6 +308,13 @@ export class Camera {
                   gravityDistance = minGravitySpeedDistance(this.focusedBody.mass),
                   cnvsGravityDistance = this.map2CameraSize(gravityDistance)
 
+            this.drawRadialGradient(
+              particle.pos,
+              gravityDistance,
+              '#ffffff',
+              x => x**.25, 128
+            )
+
             this.drawVector({
               pos: particle.pos,
               posTo: realVelocity,
@@ -377,13 +328,6 @@ export class Camera {
                 pos: {x: 8 / this.scale, y: -8 / this.scale}
               }
             })
-
-            this.drawRadialGradient(
-              particle.pos,
-              gravityDistance,
-              '#ffffff',
-              x => x**.25, 128
-            )
 
             this.canvasHelper.drawBall({
               pos: bodyCnvsPos,
@@ -439,11 +383,6 @@ export class Camera {
           }
         }
       }
-    }
-
-    if(this.keyboardHandler?.focus_body_request) {
-      this.removeFocusBody()
-      this.keyboardHandler.focus_body_request = false
     }
 
     _game_params.camera.pos = this.getPos('relative')
