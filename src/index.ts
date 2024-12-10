@@ -68,6 +68,8 @@ const loopInterval = getIntervalChangableDelay(() => {
     gravityForces.forEach(force => particle.impulse(force.velocity))
   }
 
+  _game_params.gameAge += GAME_PARAMS.simulationSpeed
+
   frameRate.tpsgraph.end()
 })
 
@@ -79,13 +81,14 @@ const renderInterval = getIntervalChangableDelay(() => {
   frameRate.fpsgraph.end()
 })
 
-simulationSettingsFolder.addBinding(GAME_PARAMS, 'tps', {min: 0, max: 1000, step: 1}).on('change', ({last, value}: {last: boolean, value: number}) => last && loopInterval(1000 / value))
-simulationSettingsFolder.addBinding(GAME_PARAMS, 'fps', {min: 0, max: 1000, step: 1}).on('change', ({last, value}: {last: boolean, value: number}) => last && renderInterval(1000 / value))
+simulationSettingsFolder.addBinding(GAME_PARAMS, 'tps', {min: 0, max: 1000, step: 1, format: (v: number) => v + ' t/s'}).on('change', ({last, value}: {last: boolean, value: number}) => last && loopInterval(1000 / value))
+simulationSettingsFolder.addBinding(GAME_PARAMS, 'fps', {min: 0, max: 1000, step: 1, format: (v: number) => v + ' t/s'}).on('change', ({last, value}: {last: boolean, value: number}) => last && renderInterval(1000 / value))
 
-simulationSettingsFolder.addBinding(GAME_PARAMS, 'simulationSpeed', {step: 1})
+simulationSettingsFolder.addBinding(GAME_PARAMS, 'simulationSpeed', {format: (v: number) => v + ' sec/t'})
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'gravity', {format: (value: number) => value.toExponential()})
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'AU', {format: (value: number) => value.toExponential()})
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'minCountedGravityVeclocity', {format: (value: number) => value.toExponential(), label: 'minGravity'})
+simulationSettingsFolder.addBinding(_game_params, 'gameAge', {format: (value: number) => value + ' sec', readonly: true})
 
 cameraSettingsFolder.addBinding(_game_params.camera, 'pos', {
   label: 'pos',
@@ -103,7 +106,7 @@ cameraSettingsFolder.addBinding(_game_params.camera, 'scale', {format: (value: n
 camera.bodyVelocityPanes = {
   number: cameraSettingsFolder.addBinding(_game_params.camera, 'focusBodyVelocity', {
     label: 'bodyVelocity',
-    format: (value: number) => number2MS(value, metricalIMS, 'm/t', 3),
+    format: (value: number) => number2MS(value, metricalIMS, 'm/sec', 3),
     readonly: true,
   }),
   graph: cameraSettingsFolder.addBinding(_game_params.camera, 'focusBodyVelocity', {

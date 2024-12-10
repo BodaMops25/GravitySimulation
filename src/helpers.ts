@@ -20,6 +20,7 @@ export const _game_params: _game_params_type = {
     focusBodyGravityPoints: [],
     scale: 9e-10
   },
+  gameAge: 0
 }
 
 export const metricalIMS: PhisMarks[] = [
@@ -51,6 +52,13 @@ export function number2MS(number: number, marks: PhisMarks[], zeroMark: string, 
 
     if(10**exp <= number && number < 10**exp2) return (isNegative ? '-' : '') + (number / 10**exp).toFixed(digits) + ' ' + mark + (exp !== 0 ? zeroMark : '')
   }
+}
+
+export function fomatTimeInSec(seconds: number) {
+  // (seconds / 3600 * 24 * 365).toFixed() // years
+  // ((seconds - 3600 * 24 * 365) / 3600 * 24).toFixed() // days
+  // ((seconds - 3600 * 24 * 365 - 3600 * 24) / 3600 * 24).toFixed() // hours
+  // ((seconds - 3600 * 24 * 365 - 3600 * 24 - ) / 3600 * 24).toFixed() // minutes
 }
 
 export function getIntervalChangableDelay(callback: (...params: any[]) => void, ...params: any[]) {
@@ -337,3 +345,4 @@ export function number2avarageGroup(arr: number[], threshold: number) {
 }
 
 window.GAME_PARAMS = GAME_PARAMS
+window._game_params = _game_params
