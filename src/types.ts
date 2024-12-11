@@ -8,7 +8,7 @@ export type _game_params_type = {
     focusBodyGravityPoints: PolarVec[],
     scale: number
   },
-  gameAge: number
+  simulationAge: number
 }
 
 export type PhisMarks = {exp: number, mark: string}

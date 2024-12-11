@@ -10,7 +10,8 @@ export const GAME_PARAMS = {
   barnesHutThreshold: 1, // working only with gravityAlgorithmType: 'barnes-hut', less value == more comparison => less performance
   mapBodyMinSize: 3,
   mapBodyCircleOffset: 2,
-  minCountedGravityVeclocity: 1e-3
+  minCountedGravityVeclocity: 1e-3,
+  minSpeedPerDistanceCoefficient: 0.05
 }
 
 export const _game_params: _game_params_type = {
@@ -20,7 +21,7 @@ export const _game_params: _game_params_type = {
     focusBodyGravityPoints: [],
     scale: 9e-10
   },
-  gameAge: 0
+  simulationAge: 0
 }
 
 export const metricalIMS: PhisMarks[] = [
@@ -356,5 +357,7 @@ export function number2avarageGroup(arr: number[], threshold: number) {
     return finalArray
 }
 
+window.distance = distance
+window.vecMagnitude = vecMagnitude
 window.GAME_PARAMS = GAME_PARAMS
 window._game_params = _game_params

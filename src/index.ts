@@ -46,29 +46,49 @@ const frameRate = {
 const loopInterval = getIntervalChangableDelay(() => {
   frameRate.tpsgraph.begin()
 
-  for(const particle of particles) particle.move()
+  for(let i = 0; i < 1; i++) {
+    let BHRoot: BarnesHutRootType
+  
+    if( GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') {
+      BHRoot = createBarnesHutTree(particles, getAreaCorners(particles))
+    }
+  
+    for(const particle of particles) {
+  
+      let bodies = particles
+      if(GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') bodies = simplifyBodiesForTarget(particle, BHRoot, GAME_PARAMS.barnesHutThreshold) as any
+  
+      const gravityForces = getAllGravityForces(particle, bodies)
+  
+      if(particle === camera.focusedBody) {
+        _game_params.camera.focusBodyGravityPoints = getGravityBodies2body(gravityForces, GAME_PARAMS.minCountedGravityVeclocity)
+      }
+  
+      gravityForces.forEach(force => {
+        particle.impulse(force.velocity)
 
-  let BHRoot: BarnesHutRootType
+        const particleRealSpeed = force.force / force.target.mass,
+              particleSpeed = particleRealSpeed * GAME_PARAMS.simulationSpeed
 
-  if( GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') {
-    BHRoot = createBarnesHutTree(particles, getAreaCorners(particles))
-  }
+        if(particleSpeed / force.distance > GAME_PARAMS.minSpeedPerDistanceCoefficient) {
 
-  for(const particle of particles) {
+          const newParticleSpeed = force.distance * GAME_PARAMS.minSpeedPerDistanceCoefficient,
+                newSimSpeed = Math.floor(newParticleSpeed / particleRealSpeed)
 
-    let bodies = particles
-    if(GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') bodies = simplifyBodiesForTarget(particle, BHRoot, GAME_PARAMS.barnesHutThreshold) as any
-
-    const gravityForces = getAllGravityForces(particle, bodies)
-
-    if(particle === camera.focusedBody) {
-      _game_params.camera.focusBodyGravityPoints = getGravityBodies2body(gravityForces, GAME_PARAMS.minCountedGravityVeclocity)
+          GAME_PARAMS.simulationSpeed = newSimSpeed
+          console.log('simulation speed has been reduced to ' + newSimSpeed + ', to process physics correctly!')
+        }
+      })
     }
 
-    gravityForces.forEach(force => particle.impulse(force.velocity))
-  }
+    for(const particle of particles) particle.move()
 
-  _game_params.gameAge += GAME_PARAMS.simulationSpeed
+    // k = .05
+    // v/r=k => r*k=v
+    // v=v0*s => v/v0=s
+  
+    _game_params.simulationAge += GAME_PARAMS.simulationSpeed
+  }
 
   frameRate.tpsgraph.end()
 })
@@ -76,7 +96,7 @@ const loopInterval = getIntervalChangableDelay(() => {
 const renderInterval = getIntervalChangableDelay(() => {
   frameRate.fpsgraph.begin()
   canvasHelper.ctx?.clearRect(0, 0, canvas.width, canvas.height)
-  camera.render({debug: false})
+  camera.render({debug: true})
   camera.canvasHelper.drawCursor()
   frameRate.fpsgraph.end()
 })
@@ -88,7 +108,7 @@ simulationSettingsFolder.addBinding(GAME_PARAMS, 'simulationSpeed', {format: (v:
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'gravity', {format: (value: number) => value.toExponential()})
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'AU', {format: (value: number) => value.toExponential()})
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'minCountedGravityVeclocity', {format: (value: number) => value.toExponential(), label: 'minGravity'})
-simulationSettingsFolder.addBinding(_game_params, 'gameAge', {format: (value: number) => {
+simulationSettingsFolder.addBinding(_game_params, 'simulationAge', {format: (value: number) => {
   const timeObj = formatTimeInSec(value);
   return [
     [timeObj.years, 'y'],
@@ -129,7 +149,7 @@ camera.bodyVelocityPanes = {
 
 if(sessionStorage['gameSettings'] !== undefined) pane.importState(JSON.parse(sessionStorage['gameSettings']))
 
-import("./particles-map")
+import("./particles-map2")
   .then((module) => {
     module.default.forEach(particle => particles.push(particle))
     if(sessionStorage['focus-body']) {

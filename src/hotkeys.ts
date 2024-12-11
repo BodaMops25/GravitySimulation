@@ -61,6 +61,8 @@ export class KeyboardListener {
         })
 
         document.body.addEventListener("mousedown", event => {
+            if(event.button === 1) event.preventDefault()
+                
             this.isMouseClickTimeout = setTimeout(() => {
                 this.isMouseClickTimeout = undefined
             }, 300)

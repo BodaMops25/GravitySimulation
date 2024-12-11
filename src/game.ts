@@ -10,15 +10,14 @@ export function minGravitySpeedDistance(bodyMass: number) {
   return (bodyMass * (1/GAME_PARAMS.minCountedGravityVeclocity) * GAME_PARAMS.gravity)**.5
 }
 
-// GAME_PARAMS.minCountedGravityVeclocity
-
 export function gravityForce2body(target: Particle, body: Particle) {
 
-  const force = gravityForce(distance(body.pos, target.pos), target.mass, body.mass),
-          angle = angleBetweenVec(target.pos, body.pos),
-          velocity = polar2cartesian({magnitude: force / target.mass, angle})
+  const range = distance(body.pos, target.pos),
+        force = gravityForce(range, target.mass, body.mass),
+        angle = angleBetweenVec(target.pos, body.pos),
+        velocity = polar2cartesian({magnitude: force / target.mass, angle})
 
-    return {force, angle, velocity, target, body}
+    return {distance: range, force, angle, velocity, target, body}
 }
 
 export function getAllGravityForces(particle: Particle, particles: Particle[]) {
