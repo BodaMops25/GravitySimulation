@@ -38,6 +38,14 @@ export const metricalIMS: PhisMarks[] = [
   {exp: 18, mark: 'E'},
 ]
 
+export const timesInSec = {
+	year: 60 * 60 * 24 * 365,
+  day: 60 * 60 * 24,
+	hour: 60 * 60,
+  minute: 60,
+  second: 1
+}
+
 export function number2MS(number: number, marks: PhisMarks[], zeroMark: string, digits = 0) {
   const isNegative = number < 0
 
@@ -54,11 +62,15 @@ export function number2MS(number: number, marks: PhisMarks[], zeroMark: string, 
   }
 }
 
-export function fomatTimeInSec(seconds: number) {
-  // (seconds / 3600 * 24 * 365).toFixed() // years
-  // ((seconds - 3600 * 24 * 365) / 3600 * 24).toFixed() // days
-  // ((seconds - 3600 * 24 * 365 - 3600 * 24) / 3600 * 24).toFixed() // hours
-  // ((seconds - 3600 * 24 * 365 - 3600 * 24 - ) / 3600 * 24).toFixed() // minutes
+export function formatTimeInSec(seconds: number) {
+  return ['year', 'day', 'hour', 'minute', 'second'].reduce((obj, time) => {
+    const objPropKey = time + 's',
+          timeInSec = timesInSec[time as keyof typeof timesInSec]
+
+    obj[objPropKey] = Math.floor(seconds / timeInSec)
+    seconds -= obj[objPropKey] * timeInSec
+    return obj
+  }, {} as any)
 }
 
 export function getIntervalChangableDelay(callback: (...params: any[]) => void, ...params: any[]) {

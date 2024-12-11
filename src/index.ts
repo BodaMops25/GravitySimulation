@@ -1,4 +1,4 @@
-import { _game_params, CanvasHelper, GAME_PARAMS, getIntervalChangableDelay, metricalIMS, number2MS, vecMagnitude } from "./helpers"
+import { _game_params, CanvasHelper, formatTimeInSec, GAME_PARAMS, getIntervalChangableDelay, metricalIMS, number2MS, vecMagnitude } from "./helpers"
 import { Particle } from "./particles"
 import { Camera } from "./camera"
 import { getAllGravityForces, getGravityBodies2body } from "./game"
@@ -88,7 +88,16 @@ simulationSettingsFolder.addBinding(GAME_PARAMS, 'simulationSpeed', {format: (v:
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'gravity', {format: (value: number) => value.toExponential()})
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'AU', {format: (value: number) => value.toExponential()})
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'minCountedGravityVeclocity', {format: (value: number) => value.toExponential(), label: 'minGravity'})
-simulationSettingsFolder.addBinding(_game_params, 'gameAge', {format: (value: number) => value + ' sec', readonly: true})
+simulationSettingsFolder.addBinding(_game_params, 'gameAge', {format: (value: number) => {
+  const timeObj = formatTimeInSec(value);
+  return [
+    [timeObj.years, 'y'],
+    [timeObj.days, 'd'],
+    [timeObj.hours, 'h'],
+    [timeObj.minutes, 'm'],
+    [timeObj.seconds, 's']
+  ].reduce((str, [value, timeKey]) => str + value.toString().padStart(2, '0') + ' ' + timeKey + ' ', '')
+}, readonly: true})
 
 cameraSettingsFolder.addBinding(_game_params.camera, 'pos', {
   label: 'pos',
