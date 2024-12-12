@@ -12,17 +12,11 @@ particlesMap.push(new Particle({
 }))
 
 particlesMap.push(new Particle({
+  pos: {x: 1e4, y: 0},
   mass: 1,
+  velocity: {x: -1e-4, y: .125e-4},
   radius: 10,
   color: 'aqua'
 }))
-
-setSatellite2Body(
-  particlesMap[1],
-  particlesMap[0],
-  1e4, 0, true
-)
-
-// particlesMap[1].pos.y -= particlesMap[1].velocity.y * GAME_PARAMS.simulationSpeed
 
 export default particlesMap

@@ -1,4 +1,4 @@
-import { _game_params, CanvasHelper, formatTimeInSec, GAME_PARAMS, getIntervalChangableDelay, metricalIMS, number2MS, vecMagnitude } from "./helpers"
+import { _game_params, CanvasHelper, distance, formatTimeInSec, GAME_PARAMS, getIntervalChangableDelay, metricalIMS, number2MS, vecMagnitude } from "./helpers"
 import { Particle } from "./particles"
 import { Camera } from "./camera"
 import { getAllGravityForces, getGravityBodies2body } from "./game"
@@ -57,6 +57,23 @@ const loopInterval = getIntervalChangableDelay(() => {
   
       let bodies = particles
       if(GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') bodies = simplifyBodiesForTarget(particle, BHRoot, GAME_PARAMS.barnesHutThreshold) as any
+
+      bodies.forEach(body => {
+        const particleRealSpeed = vecMagnitude(particle.velocity),
+              particleSpeed = particleRealSpeed * GAME_PARAMS.simulationSpeed,
+              range = distance(body.pos, particle.pos)
+
+        if(particleSpeed / range > GAME_PARAMS.minSpeedPerDistanceCoefficient) {
+
+          const newParticleSpeed = range * GAME_PARAMS.minSpeedPerDistanceCoefficient,
+                newSimSpeed = Math.floor(newParticleSpeed / particleRealSpeed)
+
+          GAME_PARAMS.simulationSpeed = newSimSpeed
+          console.log('simulation speed has been reduced to ' + newSimSpeed + ', to process physics correctly!')
+        }
+      })
+
+      particle.move()
   
       const gravityForces = getAllGravityForces(particle, bodies)
   
@@ -66,22 +83,8 @@ const loopInterval = getIntervalChangableDelay(() => {
   
       gravityForces.forEach(force => {
         particle.impulse(force.velocity)
-
-        const particleRealSpeed = force.force / force.target.mass,
-              particleSpeed = particleRealSpeed * GAME_PARAMS.simulationSpeed
-
-        if(particleSpeed / force.distance > GAME_PARAMS.minSpeedPerDistanceCoefficient) {
-
-          const newParticleSpeed = force.distance * GAME_PARAMS.minSpeedPerDistanceCoefficient,
-                newSimSpeed = Math.floor(newParticleSpeed / particleRealSpeed)
-
-          GAME_PARAMS.simulationSpeed = newSimSpeed
-          console.log('simulation speed has been reduced to ' + newSimSpeed + ', to process physics correctly!')
-        }
       })
     }
-
-    for(const particle of particles) particle.move()
 
     // k = .05
     // v/r=k => r*k=v
@@ -149,7 +152,7 @@ camera.bodyVelocityPanes = {
 
 if(sessionStorage['gameSettings'] !== undefined) pane.importState(JSON.parse(sessionStorage['gameSettings']))
 
-import("./particles-map2")
+import("./particles-map")
   .then((module) => {
     module.default.forEach(particle => particles.push(particle))
     if(sessionStorage['focus-body']) {
