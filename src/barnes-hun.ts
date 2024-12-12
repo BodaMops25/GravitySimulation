@@ -1,4 +1,4 @@
-import { distance, randomId } from "./helpers"
+import { distanceBetweenVec, randomId } from "./helpers"
 import { Vec } from "./types"
 
 export function getAreaCorners(points: Point[]) {
@@ -154,7 +154,7 @@ export function simplifyBodiesForTarget(target: Point | BarnesHutRootType, bodie
 
     const sector = sectorOrPoint as BarnesHutRootType
 
-    const dist = Math.abs(distance((target as Point).pos || (target as BarnesHutRootType).data.pos, sector.data.pos)),
+    const dist = Math.abs(distanceBetweenVec((target as Point).pos || (target as BarnesHutRootType).data.pos, sector.data.pos)),
         k = sector.data.scale / dist
 
       if(k < threshold) {

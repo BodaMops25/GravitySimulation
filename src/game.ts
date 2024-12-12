@@ -1,9 +1,9 @@
-import { angleBetweenVec, distance, GAME_PARAMS, polar2cartesian, vecMagnitude } from "./helpers"
+import { angleBetweenVec, distanceBetweenVec, GAME_PARAMS, polar2cartesian, vecMagnitude } from "./helpers"
 import { Particle } from "./particles"
 import { Vec } from "./types"
 
 export function gravityForce(distance: number, mass1: number, mass2: number) {
-  return mass1 * mass2 / distance**2 * GAME_PARAMS.gravity * GAME_PARAMS.simulationSpeed
+  return mass1 * mass2 / distance**2 * GAME_PARAMS.gravity * _game_params.simulationSpeed
 }
 
 export function minGravitySpeedDistance(bodyMass: number) {
@@ -12,12 +12,12 @@ export function minGravitySpeedDistance(bodyMass: number) {
 
 export function gravityForce2body(target: Particle, body: Particle) {
 
-  const range = distance(body.pos, target.pos),
-        force = gravityForce(range, target.mass, body.mass),
+  const distance = distanceBetweenVec(body.pos, target.pos),
+        force = gravityForce(distance, target.mass, body.mass),
         angle = angleBetweenVec(target.pos, body.pos),
         velocity = polar2cartesian({magnitude: force / target.mass, angle})
 
-    return {distance: range, force, angle, velocity, target, body}
+    return {distance, force, angle, velocity, target, body}
 }
 
 export function getAllGravityForces(particle: Particle, particles: Particle[]) {
@@ -33,7 +33,7 @@ export function getAllGravityForces(particle: Particle, particles: Particle[]) {
 
 export function getGravityBodies2body(gravityPoinst: {angle: number, velocity: Vec, target: Particle, body: Particle}[], minGravitySpeed = 1) {
   return gravityPoinst.reduce<{angle: number, magnitude: number, target: Particle, body: Particle}[]>((arr, force) => {
-    const magnitude = vecMagnitude(force.velocity) / GAME_PARAMS.simulationSpeed
+    const magnitude = vecMagnitude(force.velocity) / _game_params.simulationSpeed
     if(magnitude > minGravitySpeed) arr.push({
       angle: force.angle,
       magnitude,
@@ -56,7 +56,7 @@ export function getAllOrbitBodies(target: Particle, particles: Particle[]) {
 }
 
 export function getOrbitalVelocity(target: Particle, gravityBody: Particle, isAnticlockwise?: boolean) {
-  const r = distance(gravityBody.pos, target.pos),
+  const r = distanceBetweenVec(gravityBody.pos, target.pos),
         speed = (GAME_PARAMS.gravity * gravityBody.mass / r)**.5,
         angle = angleBetweenVec(target.pos, gravityBody.pos),
         velocity = polar2cartesian({magnitude: speed, angle: angle + (isAnticlockwise ? Math.PI/2 : -Math.PI/2)})

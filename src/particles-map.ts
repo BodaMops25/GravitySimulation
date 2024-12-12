@@ -56,45 +56,45 @@ moon.velocity.y += 1000
 
 particlesMap.push(sun, earth, moon, mars, mercury, venus)
 
-for(let i = 0; i < 200; i++) {
-  const p = new Particle({
-    pos: {x: randomBetween(-255e9, 255e9), y: randomBetween(-1e10, 1e10)},
-    mass: 1e20,
-    color: 'purple',
-    radius: 1e3
-  })
+// for(let i = 0; i < 200; i++) {
+//   const p = new Particle({
+//     pos: {x: randomBetween(-255e9, 255e9), y: randomBetween(-1e10, 1e10)},
+//     mass: 1e20,
+//     color: 'purple',
+//     radius: 1e3
+//   })
 
-  p.velocity = getOrbitalVelocity(p, sun)
+//   p.velocity = getOrbitalVelocity(p, sun)
 
-  const tmp = .05
-  p.velocity.x *= randomBetween(1-tmp, 1+tmp) 
-  p.velocity.y *= randomBetween(1-tmp, 1+tmp)
+//   const tmp = .05
+//   p.velocity.x *= randomBetween(1-tmp, 1+tmp) 
+//   p.velocity.y *= randomBetween(1-tmp, 1+tmp)
 
-  particlesMap.push(p)
-}
+//   particlesMap.push(p)
+// }
 
-for(let i = 1; i < 10; i++) {
-  const p = new Particle({
-    mass: 1e6,
-    radius: 1e3,
-    color: 'blue',
-    label: 'earth_sattelites_extras_' + i
-  })
+// for(let i = 1; i < 10; i++) {
+//   const p = new Particle({
+//     mass: 1e6,
+//     radius: 1e3,
+//     color: 'blue',
+//     label: 'earth_sattelites_extras_' + i
+//   })
 
-  setSatellite2Body(p, earth, i/18 * minGravitySpeedDistance(earth.mass), 90, true)
-  particlesMap.push(p)
-}
+//   setSatellite2Body(p, earth, i/18 * minGravitySpeedDistance(earth.mass), 90, true)
+//   particlesMap.push(p)
+// }
 
-for(let i = 0; i < 3; i++) {
-  const p = new Particle({
-    mass: 1e6,
-    radius: 1e3,
-    color: 'red',
-    label: 'earth_sattelites3_extras_' + i
-  })
+// for(let i = 0; i < 3; i++) {
+//   const p = new Particle({
+//     mass: 1e6,
+//     radius: 1e3,
+//     color: 'red',
+//     label: 'earth_sattelites3_extras_' + i
+//   })
 
-  setSatellite2Body(p, earth, 380e6, 360/3*i+60, true)
-  particlesMap.push(p)
-}
+//   setSatellite2Body(p, earth, 380e6, 360/3*i+60, true)
+//   particlesMap.push(p)
+// }
 
 export default particlesMap

@@ -1,6 +1,6 @@
 import { createBarnesHutTree, simplifyBodiesForTarget } from "./barnes-hun"
 import { getAllGravityForces, getGravityBodies2body, minGravitySpeedDistance } from "./game"
-import { _game_params, CanvasHelper, distance, GAME_PARAMS, metricalIMS, number2avarageGroup, number2MS, vecMagnitude } from "./helpers"
+import { _game_params, CanvasHelper, distanceBetweenVec, GAME_PARAMS, metricalIMS, number2avarageGroup, number2MS, vecMagnitude } from "./helpers"
 import { Particle } from "./particles"
 import { CanvasColor, PolarVec, Vec } from "./types"
 
@@ -179,7 +179,7 @@ export class Camera {
 
     const cnvsPos = this.map2CameraPos(pos),
           cnvsPosTo = this.map2CameraPos(mode === 'relative' ? {x: pos.x + posTo.x, y: pos.y + posTo.y} : posTo),
-          dist = distance(cnvsPosTo, cnvsPos)
+          dist = distanceBetweenVec(cnvsPosTo, cnvsPos)
 
     this.canvasHelper.drawVector({
       pos: cnvsPos,
@@ -284,14 +284,14 @@ export class Camera {
 
     for(const particle of this.particles) {
 
-      const particleDrawn = this.drawBody(particle)
+      const particleDrawn = this.drawBody(particle) || true
 
       if(debug) {
 
         if(particleDrawn) {
           const realVelocity = {
-            x: particle.velocity.x * GAME_PARAMS.simulationSpeed,
-            y: particle.velocity.y * GAME_PARAMS.simulationSpeed
+            x: particle.velocity.x * _game_params.simulationSpeed,
+            y: particle.velocity.y * _game_params.simulationSpeed
           }
   
           if(particle !== this.focusedBody) this.drawVector({

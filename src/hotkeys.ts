@@ -1,4 +1,4 @@
-import { distance, GAME_PARAMS } from "./helpers"
+import { distanceBetweenVec, GAME_PARAMS } from "./helpers"
 import { Particle } from "./particles"
 import { Vec } from "./types"
 
@@ -164,7 +164,7 @@ export class KeyboardListener {
 
                 const mapMousePos: Vec = this.camera.camera2mapPos(this.mouse_pos),
                     focusBody = this.camera.particles.find((particle: Particle) => {
-                        return distance(mapMousePos, particle.pos) <= particle.radius + 1/this.camera.scale * GAME_PARAMS.mapBodyCircleOffset * 2
+                        return distanceBetweenVec(mapMousePos, particle.pos) <= particle.radius + 1/this.camera.scale * GAME_PARAMS.mapBodyCircleOffset * 2
                     })
 
                 if(focusBody) this.camera.focusBody(focusBody)

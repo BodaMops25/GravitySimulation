@@ -1,4 +1,5 @@
-import { _game_params_type, CanvasColor, PhisMarks, PolarVec, Vec } from "./types"
+import { Particle } from "./particles";
+import { CanvasColor, PhisMarks, PolarVec, Vec } from "./types"
 
 export const GAME_PARAMS = {
   simulationSpeed: 3600 * 6,
@@ -6,7 +7,7 @@ export const GAME_PARAMS = {
   AU: 150e9,
   tps: 65,
   fps: 65,
-  gravityAlgorithmType: 'barnes-hut', // 'all', 'barnes-hut'
+  gravityAlgorithmType: 'all', // 'all', 'barnes-hut'
   barnesHutThreshold: 1, // working only with gravityAlgorithmType: 'barnes-hut', less value == more comparison => less performance
   mapBodyMinSize: 3,
   mapBodyCircleOffset: 2,
@@ -14,14 +15,20 @@ export const GAME_PARAMS = {
   minSpeedPerDistanceCoefficient: 0.05
 }
 
-export const _game_params: _game_params_type = {
+export const _game_params = {
   camera: {
     pos: {x: 0, y: 0},
     focusBodyVelocity: 0,
-    focusBodyGravityPoints: [],
+    focusBodyGravityPoints: [] as {
+      angle: number;
+      magnitude: number;
+      target: Particle;
+      body: Particle;
+  }[],
     scale: 9e-10
   },
-  simulationAge: 0
+  simulationAge: 0,
+  simulationSpeed: 3600 * 6
 }
 
 export const metricalIMS: PhisMarks[] = [
@@ -100,7 +107,7 @@ export function vecMagnitude(vec: Vec) {
   return (vec.x**2 + vec.y**2)**.5
 }
 
-export function distance(pos2: Vec, pos: Vec) {
+export function distanceBetweenVec(pos2: Vec, pos: Vec) {
   return ((pos2.x - pos.x)**2 + (pos2.y - pos.y)**2)**.5
 }
 
@@ -357,7 +364,7 @@ export function number2avarageGroup(arr: number[], threshold: number) {
     return finalArray
 }
 
-window.distance = distance
+window.distanceBetweenVec = distanceBetweenVec
 window.vecMagnitude = vecMagnitude
 window.GAME_PARAMS = GAME_PARAMS
 window._game_params = _game_params

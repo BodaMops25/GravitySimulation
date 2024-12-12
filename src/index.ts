@@ -1,7 +1,7 @@
-import { _game_params, CanvasHelper, distance, formatTimeInSec, GAME_PARAMS, getIntervalChangableDelay, metricalIMS, number2MS, vecMagnitude } from "./helpers"
+import { _game_params, CanvasHelper, distanceBetweenVec, formatTimeInSec, GAME_PARAMS, getIntervalChangableDelay, metricalIMS, number2MS, vecMagnitude } from "./helpers"
 import { Particle } from "./particles"
 import { Camera } from "./camera"
-import { getAllGravityForces, getGravityBodies2body } from "./game"
+import { getAllGravityForces, getGravityBodies2body, gravityForce2body } from "./game"
 import { BarnesHutRootType, createBarnesHutTree, getAreaCorners, simplifyBodiesForTarget } from "./barnes-hun"
 import {Pane} from 'tweakpane'
 import * as TweakpaneEssentials from '@tweakpane/plugin-essentials'
@@ -58,20 +58,37 @@ const loopInterval = getIntervalChangableDelay(() => {
       let bodies = particles
       if(GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') bodies = simplifyBodiesForTarget(particle, BHRoot, GAME_PARAMS.barnesHutThreshold) as any
 
-      bodies.forEach(body => {
-        const particleRealSpeed = vecMagnitude(particle.velocity),
-              particleSpeed = particleRealSpeed * GAME_PARAMS.simulationSpeed,
-              range = distance(body.pos, particle.pos)
+      const simSpeed = bodies.reduce<number[]>((arr, body) => {
+        if(particle === body) return arr
 
-        if(particleSpeed / range > GAME_PARAMS.minSpeedPerDistanceCoefficient) {
+        const relativeVelocity = {
+          x: particle.velocity.x - body.velocity.x,
+          y: particle.velocity.y - body.velocity.y
+        }
 
-          const newParticleSpeed = range * GAME_PARAMS.minSpeedPerDistanceCoefficient,
+        const particleRealSpeed = vecMagnitude(relativeVelocity),
+              distance = distanceBetweenVec(body.pos, particle.pos)
+
+        const particleSpeed = vecMagnitude({
+          x: relativeVelocity.x * _game_params.simulationSpeed,
+          y: relativeVelocity.y * _game_params.simulationSpeed
+        })
+
+        const gravityRealSpeed2body = vecMagnitude(
+          gravityForce2body(particle, body).velocity
+        )
+
+        const newParticleSpeed = distance * GAME_PARAMS.minSpeedPerDistanceCoefficient,
                 newSimSpeed = Math.floor(newParticleSpeed / particleRealSpeed)
 
-          GAME_PARAMS.simulationSpeed = newSimSpeed
-          console.log('simulation speed has been reduced to ' + newSimSpeed + ', to process physics correctly!')
-        }
-      })
+        arr.push(newSimSpeed)
+        return arr
+      }, [])
+
+      // console.log(simSpeed, Math.min(...simSpeed, GAME_PARAMS.simulationSpeed))
+
+      // _game_params.simulationSpeed = Math.min(...simSpeed, GAME_PARAMS.simulationSpeed)
+      _game_params.simulationSpeed = GAME_PARAMS.simulationSpeed
 
       particle.move()
   
@@ -85,12 +102,8 @@ const loopInterval = getIntervalChangableDelay(() => {
         particle.impulse(force.velocity)
       })
     }
-
-    // k = .05
-    // v/r=k => r*k=v
-    // v=v0*s => v/v0=s
   
-    _game_params.simulationAge += GAME_PARAMS.simulationSpeed
+    _game_params.simulationAge += _game_params.simulationSpeed
   }
 
   frameRate.tpsgraph.end()
@@ -108,6 +121,7 @@ simulationSettingsFolder.addBinding(GAME_PARAMS, 'tps', {min: 0, max: 1000, step
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'fps', {min: 0, max: 1000, step: 1, format: (v: number) => v + ' t/s'}).on('change', ({last, value}: {last: boolean, value: number}) => last && renderInterval(1000 / value))
 
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'simulationSpeed', {format: (v: number) => v + ' sec/t'})
+simulationSettingsFolder.addBinding(_game_params, 'simulationSpeed', {format: (v: number) => v + ' sec/t', readonly: true, label: '_simulationSpeed'})
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'gravity', {format: (value: number) => value.toExponential()})
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'AU', {format: (value: number) => value.toExponential()})
 simulationSettingsFolder.addBinding(GAME_PARAMS, 'minCountedGravityVeclocity', {format: (value: number) => value.toExponential(), label: 'minGravity'})

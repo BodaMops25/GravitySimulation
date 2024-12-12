@@ -33,8 +33,8 @@ export class Particle {
   }
 
   move = () => {
-    this.pos.x += this.velocity.x * GAME_PARAMS.simulationSpeed
-    this.pos.y += this.velocity.y * GAME_PARAMS.simulationSpeed
+    this.pos.x += this.velocity.x * _game_params.simulationSpeed
+    this.pos.y += this.velocity.y * _game_params.simulationSpeed
   }
 
   impulse = (vec: Vec) => {
