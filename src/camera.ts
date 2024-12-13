@@ -1,5 +1,5 @@
 import { createBarnesHutTree, simplifyBodiesForTarget } from "./barnes-hun"
-import { getAllGravityForces, getGravityBodies2body, minGravitySpeedDistance } from "./game"
+import { getAllGravityForces, getAllOrbitBodies, getGravityBodies2body, minGravitySpeedDistance } from "./game"
 import { _game_params, CanvasHelper, distanceBetweenVec, GAME_PARAMS, metricalIMS, number2avarageGroup, number2MS, vecMagnitude } from "./helpers"
 import { Particle } from "./particles"
 import { CanvasColor, PolarVec, Vec } from "./types"
@@ -289,14 +289,29 @@ export class Camera {
       if(debug) {
 
         if(particleDrawn) {
-          const realVelocity = {
-            x: particle.velocity.x * _game_params.simulationSpeed,
-            y: particle.velocity.y * _game_params.simulationSpeed
+
+          // const motherBody = getAllOrbitBodies(particle, this.particles).reduce<{body?: Particle, distance?: number}>((mb, body) => {
+          //   const distance = distanceBetweenVec(particle.pos, body.pos)
+
+          //   if(mb.distance !== undefined && distance > mb.distance) return mb
+          //   return {body, distance}
+          // }, {body: undefined, distance: undefined}).body
+
+          const motherBody: undefined = undefined
+
+          const rawRelativeVelocity = {
+            x: (particle.velocity.x - (motherBody?.velocity.x || 0)),
+            y: (particle.velocity.y - (motherBody?.velocity.y || 0))
+          }
+
+          const relativeVelocity = {
+            x: rawRelativeVelocity.x * _game_params.simulationSpeed,
+            y: rawRelativeVelocity.y * _game_params.simulationSpeed
           }
   
           if(particle !== this.focusedBody) this.drawVector({
             pos: particle.pos,
-            posTo: realVelocity,
+            posTo: relativeVelocity,
             size: {size: 1, minSize: 2},
             color: '#fff',
             mode: 'relative'
@@ -317,13 +332,13 @@ export class Camera {
 
             this.drawVector({
               pos: particle.pos,
-              posTo: realVelocity,
+              posTo: relativeVelocity,
               size: {size: 1, minSize: 2},
               color: '#fff',
               mode: 'relative',
               textEnd: { 
                 size: 20 / this.scale,
-                string: speed.toFixed() + ' m/t',
+                string: vecMagnitude(rawRelativeVelocity).toFixed() + ' m/t',
                 color: '#fff',
                 pos: {x: 8 / this.scale, y: -8 / this.scale}
               }

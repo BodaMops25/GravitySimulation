@@ -52,9 +52,10 @@ const loopInterval = getIntervalChangableDelay(() => {
     if( GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') {
       BHRoot = createBarnesHutTree(particles, getAreaCorners(particles))
     }
-  
+
+    const minSimSpeed: number[] = []
+
     for(const particle of particles) {
-  
       let bodies = particles
       if(GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') bodies = simplifyBodiesForTarget(particle, BHRoot, GAME_PARAMS.barnesHutThreshold) as any
 
@@ -85,10 +86,17 @@ const loopInterval = getIntervalChangableDelay(() => {
         return arr
       }, [])
 
-      // console.log(simSpeed, Math.min(...simSpeed, GAME_PARAMS.simulationSpeed))
+      minSimSpeed.push(Math.min(...simSpeed))
+    }
 
-      // _game_params.simulationSpeed = Math.min(...simSpeed, GAME_PARAMS.simulationSpeed)
-      _game_params.simulationSpeed = GAME_PARAMS.simulationSpeed
+    const min = Math.min(...minSimSpeed, GAME_PARAMS.simulationSpeed) || 1
+
+    _game_params.simulationSpeed = min
+  
+    for(const particle of particles) {
+  
+      let bodies = particles
+      if(GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') bodies = simplifyBodiesForTarget(particle, BHRoot, GAME_PARAMS.barnesHutThreshold) as any
 
       particle.move()
   

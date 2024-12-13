@@ -4,12 +4,12 @@ import { Particle } from "./particles"
 
 const particlesMap: Particle[] = []
 
-const sun = new Particle({
+const /* sun = new Particle({
   mass: 2e30,
   color: 'yellow',
   radius: 7e8,
   label: 'sun'
-}),
+}), */
 earth = new Particle({
   pos: {x: GAME_PARAMS.AU, y: 0},
   mass: 6e24,
@@ -17,7 +17,7 @@ earth = new Particle({
   color: 'aqua',
   radius: 6.4e6,
   label: 'earth'
-}),
+})/* ,
 mars = new Particle({
   pos: {x: 1.5 * GAME_PARAMS.AU, y: 0},
   mass: 6e23,
@@ -41,7 +41,7 @@ venus = new Particle({
   color: 'white',
   radius: 6e6,
   label: 'venus'
-}),
+}) */,
 moon = new Particle({
   // pos: {x: GAME_PARAMS.AU - minGravitySpeedDistance(earth.mass)/* 380e6 */, y: 0},
   mass: 7e22,
@@ -54,7 +54,8 @@ moon = new Particle({
 setSatellite2Body(moon, earth, 380e6, 0)
 moon.velocity.y += 1000
 
-particlesMap.push(sun, earth, moon, mars, mercury, venus)
+// particlesMap.push(sun, earth, moon, mars, mercury, venus)
+particlesMap.push(earth, moon)
 
 // for(let i = 0; i < 200; i++) {
 //   const p = new Particle({
