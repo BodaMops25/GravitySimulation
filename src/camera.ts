@@ -35,9 +35,9 @@ export class Camera {
   }
   focusedBody?: Particle
 
-  constructor({particles, pos = {x: 0, y: 0}, scale = 1, focusedBody, canvasHelper, tweakpane, bodyVelocityPanes}: CameraConstructor) {
-    
-    this._pos = {...pos}
+  constructor({ particles, pos = { x: 0, y: 0 }, scale = 1, focusedBody, canvasHelper, tweakpane, bodyVelocityPanes }: CameraConstructor) {
+
+    this._pos = { ...pos }
 
     this.scale = scale
     this.particles = particles
@@ -52,17 +52,17 @@ export class Camera {
       case type === 'absolute' && !this.focusedBody:
       case type === 'relative' && !this.focusedBody:
       case type === 'relative' && this.focusedBody !== undefined:
-        return {...this._pos}
+        return { ...this._pos }
 
       case type === 'absolute' && this.focusedBody !== undefined:
         return {
           x: this.focusedBody.pos.x + this._pos.x,
           y: this.focusedBody.pos.y + this._pos.y
         }
-        
+
       default:
         console.warn('Must set type absolute or relative')
-        return {x: 0, y: 0}
+        return { x: 0, y: 0 }
     }
   }
 
@@ -71,23 +71,23 @@ export class Camera {
       case type === 'absolute' && !this.focusedBody:
       case type === 'relative' && !this.focusedBody:
       case type === 'relative' && this.focusedBody !== undefined:
-        this._pos = {...pos}
+        this._pos = { ...pos }
         return type
 
       case type === 'absolute' && this.focusedBody !== undefined:
         this._pos.x = pos.x - this.focusedBody.pos.x
         this._pos.y = pos.y - this.focusedBody.pos.y
         return type
-    
+
       default:
         console.warn('Must set type absolute or relative')
-        return {x: 0, y: 0}
+        return { x: 0, y: 0 }
     }
   }
 
   map2CameraSize = (number: number, minSize?: number) => {
-    const size: CanvasSize = {value: this.scale * number, status: 'original'}
-    if(minSize && size.value < minSize) {
+    const size: CanvasSize = { value: this.scale * number, status: 'original' }
+    if (minSize && size.value < minSize) {
       size.value = minSize
       size.status = 'minSize'
     }
@@ -111,22 +111,22 @@ export class Camera {
     }
   }
 
-  isObjectInCamera = ({pos, size = 0, context}: {pos: Vec, size: number, context: 'canvas' | 'map'}) => {
+  isObjectInCamera = ({ pos, size = 0, context }: { pos: Vec, size: number, context: 'canvas' | 'map' }) => {
 
     let canvasPos: Vec, canvasSize: number
 
     switch (context) {
       case 'canvas':
-        canvasPos = {...pos}
+        canvasPos = { ...pos }
         canvasSize = size
         break;
       case 'map':
         canvasPos = this.map2CameraPos(pos),
-        canvasSize = this.map2CameraSize(size).value
+          canvasSize = this.map2CameraSize(size).value
         break;
     }
 
-    if(
+    if (
       (canvasPos.x + canvasSize < 0 || this.canvasHelper.canvas.width < canvasPos.x - canvasSize) ||
       (canvasPos.y + canvasSize < 0 || this.canvasHelper.canvas.height < canvasPos.y - canvasSize)
     ) return false
@@ -136,7 +136,7 @@ export class Camera {
 
   drawRadialGradient = (pos: Vec, radius: number, hexColor: string, func: (x: number) => number, steps?: number) => {
     const canvasPos = this.map2CameraPos(pos),
-          size = this.map2CameraSize(radius).value
+      size = this.map2CameraSize(radius).value
 
     const gradient = this.canvasHelper.nonLinearGradient({
       pos1: canvasPos, r: 0,
@@ -146,7 +146,35 @@ export class Camera {
       shape: 'radial',
       steps
     })
-    this.canvasHelper.drawBall({pos: canvasPos, scale: size, color: gradient})
+    this.canvasHelper.drawBall({ pos: canvasPos, scale: size, color: gradient })
+  }
+
+  drawGravityGradient = (pos: Vec, radius: number, bodyRadius: number, hexColor: string) => {
+    const canvasPos = this.map2CameraPos(pos),
+      size = this.map2CameraSize(radius).value,
+      minRadius = this.map2CameraSize(bodyRadius, GAME_PARAMS.mapBodyMinSize).value
+
+    if (
+      size <= minRadius ||
+      !this.isObjectInCamera({ pos: canvasPos, size, context: 'canvas' })
+    ) return
+
+    // Gravity is proportional to 1 / distance^2. Logarithmic radii make
+    // neighbouring rings represent the same relative change in field strength.
+    // The first ring is exactly on the body's visible edge.
+    const ringCount = Math.min(32, Math.max(2, Math.ceil(size / 4)))
+    const radiusRatio = size / minRadius
+
+    for (let i = 0; i < ringCount; i++) {
+      const progress = ringCount === 1 ? 1 : i / (ringCount - 1)
+      const ringRadius = minRadius * radiusRatio ** progress
+      this.canvasHelper.drawBall({
+        pos: canvasPos,
+        scale: ringRadius,
+        strokeScale: 1,
+        strokeColor: hexColor
+      })
+    }
   }
 
   drawVector = ({
@@ -160,7 +188,7 @@ export class Camera {
   }: {
     pos: Vec,
     posTo: Vec,
-    size: {size: number, minSize?: number},
+    size: { size: number, minSize?: number },
     color?: CanvasColor,
     mode?: 'relative' | 'absolute',
     textStart?: {
@@ -178,8 +206,8 @@ export class Camera {
   }) => {
 
     const cnvsPos = this.map2CameraPos(pos),
-          cnvsPosTo = this.map2CameraPos(mode === 'relative' ? {x: pos.x + posTo.x, y: pos.y + posTo.y} : posTo),
-          dist = distanceBetweenVec(cnvsPosTo, cnvsPos)
+      cnvsPosTo = this.map2CameraPos(mode === 'relative' ? { x: pos.x + posTo.x, y: pos.y + posTo.y } : posTo),
+      dist = distanceBetweenVec(cnvsPosTo, cnvsPos)
 
     this.canvasHelper.drawVector({
       pos: cnvsPos,
@@ -212,21 +240,21 @@ export class Camera {
   drawBody = (particle: Particle) => {
 
     const pos = this.map2CameraPos(particle.pos),
-          scale = this.map2CameraSize(particle.radius, GAME_PARAMS.mapBodyMinSize)
+      scale = this.map2CameraSize(particle.radius, GAME_PARAMS.mapBodyMinSize)
 
-    if(!this.isObjectInCamera({
+    if (!this.isObjectInCamera({
       pos,
       size: scale.value + GAME_PARAMS.mapBodyCircleOffset,
       context: 'canvas'
     })) return false
-    
+
     this.canvasHelper.drawBall({
-      pos, 
+      pos,
       scale: scale.value,
       color: particle.color,
     })
 
-    if(scale.status === 'minSize') {
+    if (scale.status === 'minSize') {
       this.canvasHelper.drawBall({
         pos,
         scale: scale.value + GAME_PARAMS.mapBodyCircleOffset,
@@ -243,11 +271,11 @@ export class Camera {
 
   focusBody = (particle: Particle) => {
     this.focusedBody = particle
-    this.setPos({x: 0, y: 0}, 'relative')
-    if(this.bodyVelocityPanes?.number) {
+    this.setPos({ x: 0, y: 0 }, 'relative')
+    if (this.bodyVelocityPanes?.number) {
       this.bodyVelocityPanes.number.hidden = false
     }
-    if(this.bodyVelocityPanes?.graph) {
+    if (this.bodyVelocityPanes?.graph) {
       this.bodyVelocityPanes.graph.hidden = false
     }
 
@@ -255,7 +283,7 @@ export class Camera {
 
     let bodies = this.particles
 
-    if(GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') {
+    if (GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') {
       const BHRoot = createBarnesHutTree(this.particles)
       bodies = simplifyBodiesForTarget(this.focusedBody, BHRoot, GAME_PARAMS.barnesHutThreshold) as any
     }
@@ -263,32 +291,32 @@ export class Camera {
     const forces = getAllGravityForces(this.focusedBody, bodies)
     _game_params.camera.focusBodyGravityPoints = getGravityBodies2body(forces, GAME_PARAMS.minCountedGravityVeclocity)
   }
-  
+
   removeFocusBody = () => {
     const coords = this.getPos('absolute')
     this.focusedBody = undefined
     this.setPos(coords, 'absolute')
     _game_params.camera.focusBodyVelocity = 0
 
-    if(this.bodyVelocityPanes?.number) {
+    if (this.bodyVelocityPanes?.number) {
       this.bodyVelocityPanes.number.hidden = true
     }
-    if(this.bodyVelocityPanes?.graph) {
+    if (this.bodyVelocityPanes?.graph) {
       this.bodyVelocityPanes.graph.hidden = true
     }
 
     sessionStorage['focus-body'] = undefined
   }
 
-  render = ({debug}: {debug?: boolean} = {}) => {
+  render = ({ debug }: { debug?: boolean } = {}) => {
 
-    for(const particle of this.particles) {
+    for (const particle of this.particles) {
 
       const particleDrawn = this.drawBody(particle) || true
 
-      if(debug) {
+      if (debug) {
 
-        if(particleDrawn) {
+        if (particleDrawn) {
 
           // const motherBody = getAllOrbitBodies(particle, this.particles).reduce<{body?: Particle, distance?: number}>((mb, body) => {
           //   const distance = distanceBetweenVec(particle.pos, body.pos)
@@ -308,89 +336,87 @@ export class Camera {
             x: rawRelativeVelocity.x * _game_params.simulationSpeed,
             y: rawRelativeVelocity.y * _game_params.simulationSpeed
           }
-  
-          if(particle !== this.focusedBody) this.drawVector({
+
+          if (particle !== this.focusedBody) this.drawVector({
             pos: particle.pos,
             posTo: relativeVelocity,
-            size: {size: 1, minSize: 2},
+            size: { size: 1, minSize: 2 },
             color: '#fff',
             mode: 'relative'
           })
           else {
 
             const speed = vecMagnitude(particle.velocity),
-                  bodyCnvsPos = this.map2CameraPos(particle.pos),
-                  gravityDistance = minGravitySpeedDistance(this.focusedBody.mass),
-                  cnvsGravityDistance = this.map2CameraSize(gravityDistance)
+              gravityDistance = minGravitySpeedDistance(this.focusedBody.mass)
 
-            this.drawRadialGradient(
+            /* this.drawRadialGradient(
               particle.pos,
               gravityDistance,
               '#ffffff',
               x => x**.25, 128
+            ) */
+
+            this.drawGravityGradient(
+              particle.pos,
+              gravityDistance,
+              particle.radius,
+              '#ffffff'
             )
 
             this.drawVector({
               pos: particle.pos,
               posTo: relativeVelocity,
-              size: {size: 1, minSize: 2},
+              size: { size: 1, minSize: 2 },
               color: '#fff',
               mode: 'relative',
-              textEnd: { 
+              textEnd: {
                 size: 20 / this.scale,
                 string: vecMagnitude(rawRelativeVelocity).toFixed() + ' m/t',
                 color: '#fff',
-                pos: {x: 8 / this.scale, y: -8 / this.scale}
+                pos: { x: 8 / this.scale, y: -8 / this.scale }
               }
             })
 
-            this.canvasHelper.drawBall({
-              pos: bodyCnvsPos,
-              scale: cnvsGravityDistance.value,
-              strokeScale: 1,
-              strokeColor: '#fff'
-            })
-
-            if(_game_params.camera.focusBodyGravityPoints.length > 0) {
+            if (_game_params.camera.focusBodyGravityPoints.length > 0) {
 
               const gravityPoints = _game_params.camera.focusBodyGravityPoints.sort((a, b) => a.angle - b.angle)
-              
-              const groups = number2avarageGroup(gravityPoints.map(item => item.angle), Math.PI/16)
+
+              const groups = number2avarageGroup(gravityPoints.map(item => item.angle), Math.PI / 16)
               const polarVelocities2display = groups.map((group) => {
-                if(typeof group === 'number') {
+                if (typeof group === 'number') {
                   return gravityPoints.find(point => point.angle === group)
                 }
 
                 const sumPolVec = group.reduce((vec, angle) => {
                   const polarVelocity = gravityPoints.find(point => point.angle === angle)
-                  if(polarVelocity) {
+                  if (polarVelocity) {
                     vec.magnitude += polarVelocity.magnitude
                     vec.angle += polarVelocity.angle
                   }
                   return vec
-                }, {magnitude: 0, angle: 0})
+                }, { magnitude: 0, angle: 0 })
 
                 sumPolVec.angle /= group.length
 
                 return sumPolVec
               }) as PolarVec[]
 
-              for(const velocity of polarVelocities2display) {
+              for (const velocity of polarVelocities2display) {
 
                 this.drawVector({
-                  pos: particle.pos, 
+                  pos: particle.pos,
                   posTo: {
                     x: Math.cos(velocity.angle) * 100 / this.scale,
                     y: Math.sin(velocity.angle) * 100 / this.scale
                   },
-                  size: {size: 1, minSize: 1},
+                  size: { size: 1, minSize: 1 },
                   color: '#fff',
                   mode: 'relative',
-                  textEnd: { 
+                  textEnd: {
                     size: 20 / this.scale,
                     string: number2MS(velocity.magnitude, metricalIMS, 'm') + '/t',
                     color: '#fff',
-                    pos: {x: 8 / this.scale, y: -8 / this.scale}
+                    pos: { x: 8 / this.scale, y: -8 / this.scale }
                   }
                 })
               }
@@ -402,7 +428,7 @@ export class Camera {
 
     _game_params.camera.pos = this.getPos('relative')
     _game_params.camera.scale = this.scale
-    if(this.focusedBody) _game_params.camera.focusBodyVelocity = vecMagnitude(this.focusedBody.velocity)
+    if (this.focusedBody) _game_params.camera.focusBodyVelocity = vecMagnitude(this.focusedBody.velocity)
 
     this.tweakpane?.refresh()
   }
