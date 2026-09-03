@@ -3,28 +3,30 @@ import { Particle } from "./particles"
 import { Camera } from "./camera"
 import { getAllGravityForces, getGravityBodies2body, gravityForce2body } from "./game"
 import { BarnesHutRootType, createBarnesHutTree, getAreaCorners, simplifyBodiesForTarget } from "./barnes-hun"
-import {Pane} from 'tweakpane'
+import { Pane } from 'tweakpane'
 import * as TweakpaneEssentials from '@tweakpane/plugin-essentials'
 import { KeyboardListener } from "./hotkeys"
 import { Vec } from "./types"
+import { KeplerOrbit } from "./kepler-orbit"
 
 // ---- SETTINGS ----
 
 const paneContainer = document.querySelector<HTMLElement>('#pane-settings-container'),
-      pane = new Pane({title: 'Settings', container: paneContainer === null ? undefined : paneContainer}) as {[key: string]: any},
-      simulationSettingsFolder = pane.addFolder({title: 'Simulation'}),
-      cameraSettingsFolder = pane.addFolder({title: 'Camera'})
+  pane = new Pane({ title: 'Settings', container: paneContainer === null ? undefined : paneContainer }) as { [key: string]: any },
+  simulationSettingsFolder = pane.addFolder({ title: 'Simulation' }),
+  orbitSettingsFolder = pane.addFolder({ title: 'Two-body orbit' }),
+  cameraSettingsFolder = pane.addFolder({ title: 'Camera' })
 
 pane.registerPlugin(TweakpaneEssentials)
 
-pane.on('change', (event: unknown) => {  
+pane.on('change', (event: unknown) => {
   sessionStorage['gameSettings'] = JSON.stringify(pane.exportState())
 })
 
 // ---- CANVAS ----
 
 const canvas = document.querySelector<HTMLCanvasElement>("#main-frame")
-if(!canvas) throw new Error('No canvas!')
+if (!canvas) throw new Error('No canvas!')
 
 canvas.width = innerWidth
 canvas.height = innerHeight
@@ -32,35 +34,86 @@ canvas.height = innerHeight
 // ---- SETTINGS ----
 
 const particles: Particle[] = [],
-      canvasHelper = new CanvasHelper(canvas),
-      keyboardHandler = new KeyboardListener({tweakpane: pane}),
-      camera = new Camera({particles, canvasHelper, tweakpane: pane, keyboardHandler})
+  canvasHelper = new CanvasHelper(canvas),
+  keyboardHandler = new KeyboardListener({ tweakpane: pane }),
+  camera = new Camera({ particles, canvasHelper, tweakpane: pane, keyboardHandler })
 
 keyboardHandler.camera = camera
 
 const frameRate = {
-  tpsgraph: simulationSettingsFolder.addBlade({view: 'fpsgraph', label: 'TPS'}),
-  fpsgraph: simulationSettingsFolder.addBlade({view: 'fpsgraph', label: 'FPS'})
+  tpsgraph: simulationSettingsFolder.addBlade({ view: 'fpsgraph', label: 'TPS' }),
+  fpsgraph: simulationSettingsFolder.addBlade({ view: 'fpsgraph', label: 'FPS' })
+}
+
+let keplerOrbit: KeplerOrbit | undefined
+const orbitInfo = { period: 0 }
+let orbitSettingsReady = false
+
+const setupOrbitSettings = () => {
+  if (orbitSettingsReady || !keplerOrbit) return
+  orbitSettingsReady = true
+
+  const resetOrbit = () => {
+    if (!keplerOrbit) return
+    keplerOrbit.resetEpoch(_game_params.simulationAge)
+    keplerOrbit.update(_game_params.simulationAge)
+    orbitInfo.period = keplerOrbit.period
+  }
+
+  orbitSettingsFolder.addBinding(keplerOrbit.params, 'periapsis', {
+    label: 'lowest distance', min: 1, format: (value: number) => number2MS(value, metricalIMS, 'm', 3)
+  }).on('change', resetOrbit)
+  orbitSettingsFolder.addBinding(keplerOrbit.params, 'apoapsis', {
+    label: 'highest distance', min: 1, format: (value: number) => number2MS(value, metricalIMS, 'm', 3)
+  }).on('change', resetOrbit)
+  orbitSettingsFolder.addBinding(keplerOrbit.params, 'orientation', {
+    min: -180, max: 180, step: 1, format: (value: number) => value.toFixed(0) + '°'
+  }).on('change', resetOrbit)
+  orbitSettingsFolder.addBinding(keplerOrbit.params, 'phase', {
+    min: 0, max: 360, step: 1, format: (value: number) => value.toFixed(0) + '°'
+  }).on('change', resetOrbit)
+  orbitSettingsFolder.addBinding(keplerOrbit.params, 'clockwise').on('change', resetOrbit)
+  orbitSettingsFolder.addBinding(orbitInfo, 'period', {
+    readonly: true,
+    format: (value: number) => {
+      const time = formatTimeInSec(value)
+      return `${time.years}y ${time.days}d ${time.hours}h`
+    }
+  })
+  orbitInfo.period = keplerOrbit.period
 }
 
 const loopInterval = getIntervalChangableDelay(() => {
   frameRate.tpsgraph.begin()
 
-  for(let i = 0; i < 1; i++) {
+  for (let i = 0; i < 1; i++) {
+    const useKepler = particles.length === 2 && GAME_PARAMS.simulationMode !== 'numerical'
+
+    if (useKepler) {
+      if (!keplerOrbit || keplerOrbit.primary !== particles[0] || keplerOrbit.secondary !== particles[1]) {
+        keplerOrbit = new KeplerOrbit(particles[0], particles[1], _game_params.simulationAge)
+        setupOrbitSettings()
+      }
+      _game_params.simulationSpeed = GAME_PARAMS.simulationSpeed
+      _game_params.simulationAge += _game_params.simulationSpeed
+      keplerOrbit.update(_game_params.simulationAge)
+      continue
+    }
+
     let BHRoot: BarnesHutRootType
-  
-    if( GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') {
+
+    if (GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') {
       BHRoot = createBarnesHutTree(particles, getAreaCorners(particles))
     }
 
     const minSimSpeed: number[] = []
 
-    for(const particle of particles) {
+    for (const particle of particles) {
       let bodies = particles
-      if(GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') bodies = simplifyBodiesForTarget(particle, BHRoot, GAME_PARAMS.barnesHutThreshold) as any
+      if (GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') bodies = simplifyBodiesForTarget(particle, BHRoot, GAME_PARAMS.barnesHutThreshold) as any
 
       const simSpeed = bodies.reduce<number[]>((arr, body) => {
-        if(particle === body) return arr
+        if (particle === body) return arr
 
         const relativeVelocity = {
           x: particle.velocity.x - body.velocity.x,
@@ -68,7 +121,7 @@ const loopInterval = getIntervalChangableDelay(() => {
         }
 
         const particleRealSpeed = vecMagnitude(relativeVelocity),
-              distance = distanceBetweenVec(body.pos, particle.pos)
+          distance = distanceBetweenVec(body.pos, particle.pos)
 
         const particleSpeed = vecMagnitude({
           x: relativeVelocity.x * _game_params.simulationSpeed,
@@ -80,7 +133,7 @@ const loopInterval = getIntervalChangableDelay(() => {
         )
 
         const newParticleSpeed = distance * GAME_PARAMS.minSpeedPerDistanceCoefficient,
-                newSimSpeed = Math.floor(newParticleSpeed / particleRealSpeed)
+          newSimSpeed = Math.floor(newParticleSpeed / particleRealSpeed)
 
         arr.push(newSimSpeed)
         return arr
@@ -92,25 +145,27 @@ const loopInterval = getIntervalChangableDelay(() => {
     const min = Math.min(...minSimSpeed, GAME_PARAMS.simulationSpeed) || 1
 
     _game_params.simulationSpeed = min
-  
-    for(const particle of particles) {
-  
+
+    for (const particle of particles) {
+
       let bodies = particles
-      if(GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') bodies = simplifyBodiesForTarget(particle, BHRoot, GAME_PARAMS.barnesHutThreshold) as any
+      if (GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') bodies = simplifyBodiesForTarget(particle, BHRoot, GAME_PARAMS.barnesHutThreshold) as any
 
       particle.move()
-  
+
       const gravityForces = getAllGravityForces(particle, bodies)
-  
-      if(particle === camera.focusedBody) {
+
+      if (particle === camera.focusedBody) {
         _game_params.camera.focusBodyGravityPoints = getGravityBodies2body(gravityForces, GAME_PARAMS.minCountedGravityVeclocity)
       }
-  
+
       gravityForces.forEach(force => {
-        particle.impulse(force.velocity)
+        if (vecMagnitude(force.velocity) >= GAME_PARAMS.minCountedGravityVeclocity) {
+          particle.impulse(force.velocity)
+        }
       })
     }
-  
+
     _game_params.simulationAge += _game_params.simulationSpeed
   }
 
@@ -120,41 +175,56 @@ const loopInterval = getIntervalChangableDelay(() => {
 const renderInterval = getIntervalChangableDelay(() => {
   frameRate.fpsgraph.begin()
   canvasHelper.ctx?.clearRect(0, 0, canvas.width, canvas.height)
-  camera.render({debug: true})
+  camera.render({ debug: true })
   camera.canvasHelper.drawCursor()
   frameRate.fpsgraph.end()
 })
 
-simulationSettingsFolder.addBinding(GAME_PARAMS, 'tps', {min: 0, max: 1000, step: 1, format: (v: number) => v + ' t/s'}).on('change', ({last, value}: {last: boolean, value: number}) => last && loopInterval(1000 / value))
-simulationSettingsFolder.addBinding(GAME_PARAMS, 'fps', {min: 0, max: 1000, step: 1, format: (v: number) => v + ' t/s'}).on('change', ({last, value}: {last: boolean, value: number}) => last && renderInterval(1000 / value))
+simulationSettingsFolder.addBinding(GAME_PARAMS, 'tps', { min: 0, max: 1000, step: 1, format: (v: number) => v + ' t/s' }).on('change', ({ last, value }: { last: boolean, value: number }) => last && loopInterval(1000 / value))
+simulationSettingsFolder.addBinding(GAME_PARAMS, 'fps', { min: 0, max: 1000, step: 1, format: (v: number) => v + ' t/s' }).on('change', ({ last, value }: { last: boolean, value: number }) => last && renderInterval(1000 / value))
 
-simulationSettingsFolder.addBinding(GAME_PARAMS, 'simulationSpeed', {format: (v: number) => v + ' sec/t'})
-simulationSettingsFolder.addBinding(_game_params, 'simulationSpeed', {format: (v: number) => v + ' sec/t', readonly: true, label: '_simulationSpeed'})
-simulationSettingsFolder.addBinding(GAME_PARAMS, 'gravity', {format: (value: number) => value.toExponential()})
-simulationSettingsFolder.addBinding(GAME_PARAMS, 'AU', {format: (value: number) => value.toExponential()})
-simulationSettingsFolder.addBinding(GAME_PARAMS, 'minCountedGravityVeclocity', {format: (value: number) => value.toExponential(), label: 'minGravity'})
-simulationSettingsFolder.addBinding(_game_params, 'simulationAge', {format: (value: number) => {
-  const timeObj = formatTimeInSec(value);
-  return [
-    [timeObj.years, 'y'],
-    [timeObj.days, 'd'],
-    [timeObj.hours, 'h'],
-    [timeObj.minutes, 'm'],
-    [timeObj.seconds, 's']
-  ].reduce((str, [value, timeKey]) => str + value.toString().padStart(2, '0') + ' ' + timeKey + ' ', '')
-}, readonly: true})
+simulationSettingsFolder.addBinding(GAME_PARAMS, 'simulationSpeed', { format: (v: number) => v + ' sec/t' })
+simulationSettingsFolder.addBinding(GAME_PARAMS, 'simulationMode', {
+  label: 'mode',
+  options: {
+    Auto: 'auto',
+    Numerical: 'numerical',
+    Kepler: 'kepler'
+  }
+}).on('change', () => {
+  if (keplerOrbit) {
+    keplerOrbit.syncFromState(_game_params.simulationAge)
+    orbitInfo.period = keplerOrbit.period
+  }
+})
+simulationSettingsFolder.addBinding(_game_params, 'simulationSpeed', { format: (v: number) => v + ' sec/t', readonly: true, label: '_simulationSpeed' })
+simulationSettingsFolder.addBinding(GAME_PARAMS, 'gravity', { format: (value: number) => value.toExponential() })
+simulationSettingsFolder.addBinding(GAME_PARAMS, 'AU', { format: (value: number) => value.toExponential() })
+simulationSettingsFolder.addBinding(GAME_PARAMS, 'minCountedGravityVeclocity', { format: (value: number) => value.toExponential(), label: 'minGravity' })
+simulationSettingsFolder.addBinding(_game_params, 'simulationAge', {
+  format: (value: number) => {
+    const timeObj = formatTimeInSec(value);
+    return [
+      [timeObj.years, 'y'],
+      [timeObj.days, 'd'],
+      [timeObj.hours, 'h'],
+      [timeObj.minutes, 'm'],
+      [timeObj.seconds, 's']
+    ].reduce((str, [value, timeKey]) => str + value.toString().padStart(2, '0') + ' ' + timeKey + ' ', '')
+  }, readonly: true
+})
 
 cameraSettingsFolder.addBinding(_game_params.camera, 'pos', {
   label: 'pos',
-  x: {step: 1, format: (value: number) => number2MS(value, metricalIMS, 'm', 1)},
-  y: {step: 1, format: (value: number) => number2MS(value, metricalIMS, 'm', 1)},
+  x: { step: 1, format: (value: number) => number2MS(value, metricalIMS, 'm', 1) },
+  y: { step: 1, format: (value: number) => number2MS(value, metricalIMS, 'm', 1) },
   picker: 'inline'
-}).on('change', ({last, value: pos}: {last: boolean, value: Vec}) => {
-  if(last) camera.setPos(pos, 'relative')
+}).on('change', ({ last, value: pos }: { last: boolean, value: Vec }) => {
+  if (last) camera.setPos(pos, 'relative')
 })
-cameraSettingsFolder.addBinding(_game_params.camera, 'scale', {format: (value: number) => number2MS(1 / value * camera.canvasHelper.canvas.width, metricalIMS, 'm', 3)})
-  .on('change', ({last, value}: {last: boolean, value: number}) => {
-    if(last) camera.scale = value
+cameraSettingsFolder.addBinding(_game_params.camera, 'scale', { format: (value: number) => number2MS(1 / value * camera.canvasHelper.canvas.width, metricalIMS, 'm', 3) })
+  .on('change', ({ last, value }: { last: boolean, value: number }) => {
+    if (last) camera.scale = value
   })
 
 camera.bodyVelocityPanes = {
@@ -172,14 +242,14 @@ camera.bodyVelocityPanes = {
   })
 }
 
-if(sessionStorage['gameSettings'] !== undefined) pane.importState(JSON.parse(sessionStorage['gameSettings']))
+if (sessionStorage['gameSettings'] !== undefined) pane.importState(JSON.parse(sessionStorage['gameSettings']))
 
-import("./particles-map")
+import("./particles-map-solar-system")
   .then((module) => {
     module.default.forEach(particle => particles.push(particle))
-    if(sessionStorage['focus-body']) {
+    if (sessionStorage['focus-body']) {
       const body = particles.find(particle => particle.label === sessionStorage['focus-body'])
-      if(body) camera.focusBody(body)
+      if (body) camera.focusBody(body)
     }
   })
 

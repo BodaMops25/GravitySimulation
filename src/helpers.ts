@@ -12,7 +12,8 @@ export const GAME_PARAMS = {
   mapBodyMinSize: 3,
   mapBodyCircleOffset: 2,
   minCountedGravityVeclocity: 1e-3,
-  minSpeedPerDistanceCoefficient: 0.05
+  minSpeedPerDistanceCoefficient: 0.05,
+  simulationMode: 'auto' as 'auto' | 'numerical' | 'kepler'
 }
 
 export const _game_params = {

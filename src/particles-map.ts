@@ -4,57 +4,24 @@ import { Particle } from "./particles"
 
 const particlesMap: Particle[] = []
 
-const /* sun = new Particle({
-  mass: 2e30,
-  color: 'yellow',
-  radius: 7e8,
-  label: 'sun'
-}), */
-earth = new Particle({
-  pos: {x: GAME_PARAMS.AU, y: 0},
+const earth = new Particle({
+  pos: { x: GAME_PARAMS.AU, y: 0 },
   mass: 6e24,
-  velocity: {x: 0, y: 30e3},
+  velocity: { x: 0, y: 30e3 },
   color: 'aqua',
   radius: 6.4e6,
   label: 'earth'
-})/* ,
-mars = new Particle({
-  pos: {x: 1.5 * GAME_PARAMS.AU, y: 0},
-  mass: 6e23,
-  velocity: {x: 0, y: 24e3},
-  color: 'darkred',
-  radius: 3.3e6,
-  label: 'mars'
 }),
-mercury = new Particle({
-  pos: {x: .4 * GAME_PARAMS.AU, y: 0},
-  mass: 3e23,
-  velocity: {x: 0, y: 47e3},
-  color: 'darkgray',
-  radius: 2.4e6,
-  label: 'mercury'
-}),
-venus = new Particle({
-  pos: {x: .7 * GAME_PARAMS.AU, y: 0},
-  mass: 5e24,
-  velocity: {x: 0, y: 35e3},
-  color: 'white',
-  radius: 6e6,
-  label: 'venus'
-}) */,
-moon = new Particle({
-  // pos: {x: GAME_PARAMS.AU - minGravitySpeedDistance(earth.mass)/* 380e6 */, y: 0},
-  mass: 7e22,
-  // velocity: {x: 0, y: 30e3 + 1000},
-  color: 'gray',
-  radius: 1.7e6,
-  label: 'moon'
-})
+  moon = new Particle({
+    mass: 7e22,
+    color: 'gray',
+    radius: 1.7e6,
+    label: 'moon'
+  })
 
 setSatellite2Body(moon, earth, 380e6, 0)
 moon.velocity.y += 1000
 
-// particlesMap.push(sun, earth, moon, mars, mercury, venus)
 particlesMap.push(earth, moon)
 
 // for(let i = 0; i < 200; i++) {
