@@ -1,27 +1,359 @@
-const fps = 60 // (16ms)
+import {Pane} from 'tweakpane'
+import * as TweakpaneEssentials from '@tweakpane/plugin-essentials'
 
-function doPhysics(deltaTime: number) { } // ~ 1-16s
+type Vec = {x: number, y: number}
+type Body = {mass: number, radius: number, color: string, pos: Vec, velocity: Vec}
 
-const physicsDt = 1 // (represent how much simulated seconds go by one do_phis() update)
-const timeSpeed = 1 // (represent how much times multiplied one real second in simulation)
+const G = 6.67430e-11
+const canvas = document.querySelector<HTMLCanvasElement>('#main-frame')
+const paneContainer = document.querySelector<HTMLElement>('#pane-settings-container')
+if (!canvas) throw new Error('Canvas #main-frame was not found')
+const ctx = canvas.getContext('2d')
+if (!ctx) throw new Error('2D canvas context is unavailable')
 
-let simulationTime = 0;
+const pane = new Pane({title: 'N-body simulation', container: paneContainer ?? undefined})
+pane.registerPlugin(TweakpaneEssentials)
+
+const performanceStats = {averagePhysicsMs: 0}
+const performanceFolder = pane.addFolder({title: 'Performance'})
+const fpsGraph = performanceFolder.addBlade({view: 'fpsgraph', label: 'FPS'}) as any
+performanceFolder.addBinding(performanceStats, 'averagePhysicsMs', {
+  label: 'avg physics', view: 'graph', readonly: true, min: 0, max: 100,
+  format: (value: number) => `${value.toFixed(4)} ms`
+})
+
+const timing = {
+  realTimeElapsed: 0,
+  simulationTimeElapsed: 0,
+  physicsDt: 0.05,
+  effectivePhysicsDt: 0.05,
+  timeSpeed: 1,
+  paused: false,
+  forcedSmallerDt: false,
+  dtLimitReason: 'none'
+}
+const precisionSettings = {
+  adaptiveDt: true,
+  minimumDt: 0.0001,
+  gravityStepFraction: 0.02,
+  maxTravelFraction: 0.05,
+  maxAngleDegrees: 2
+}
+const collisionSettings = {
+  enabled: true,
+  restitution: 0.9,
+  correctionPercent: 0.8
+}
+const orbitSettings = {
+  bodyCount: 2,
+  largeMass: 1e14,
+  smallMass: 1e11,
+  separation: 140,
+  pixelsPerMeter: 2,
+  tailLength: 800,
+  tailSampleInterval: 0.1,
+  maxTailedBodies: 20
+}
+const bodies: Body[] = []
+
 let accumulator = 0
 let lastTime = performance.now()
+let tailSampleAccumulator = 0
+const bodyTails: Vec[][] = []
 
-setInterval(() => {
+function resetOrbit() {
+  const count = Math.max(2, Math.round(orbitSettings.bodyCount))
+  const goldenAngle = Math.PI * (3 - Math.sqrt(5))
+  bodies.length = 0
+  bodies.push({mass: orbitSettings.largeMass, radius: 18, color: '#f6c85f', pos: {x: 0, y: 0}, velocity: {x: 0, y: 0}})
 
-  const now = performance.now()
-  const realTimeDt = (now - lastTime) / 1000
-  lastTime = now
-
-  accumulator += realTimeDt * timeSpeed
-
-  while (accumulator >= physicsDt) {
-    doPhysics(physicsDt)
-
-    simulationTime += physicsDt
-    accumulator -= physicsDt
+  for (let i = 1; i < count; i++) {
+    const distance = orbitSettings.separation * Math.sqrt(i)
+    const angle = i === 1 ? 0 : i * goldenAngle
+    const orbitalSpeed = Math.sqrt(G * orbitSettings.largeMass / distance)
+    bodies.push({
+      mass: orbitSettings.smallMass,
+      radius: count > 100 ? 2 : 6,
+      color: `hsl(${(i * 137.5) % 360} 75% 65%)`,
+      pos: {x: Math.cos(angle) * distance, y: Math.sin(angle) * distance},
+      velocity: {x: -Math.sin(angle) * orbitalSpeed, y: Math.cos(angle) * orbitalSpeed}
+    })
   }
 
-}, 1000 / fps)
+  // Remove net momentum and place the total center of mass at the canvas center.
+  const totalMass = bodies.reduce((sum, body) => sum + body.mass, 0)
+  const centerOfMass = bodies.reduce((sum, body) => ({
+    x: sum.x + body.pos.x * body.mass / totalMass,
+    y: sum.y + body.pos.y * body.mass / totalMass
+  }), {x: 0, y: 0})
+  const centerVelocity = bodies.reduce((sum, body) => ({
+    x: sum.x + body.velocity.x * body.mass / totalMass,
+    y: sum.y + body.velocity.y * body.mass / totalMass
+  }), {x: 0, y: 0})
+  bodies.forEach(body => {
+    body.pos.x -= centerOfMass.x
+    body.pos.y -= centerOfMass.y
+    body.velocity.x -= centerVelocity.x
+    body.velocity.y -= centerVelocity.y
+  })
+
+  timing.simulationTimeElapsed = 0
+  accumulator = 0
+  tailSampleAccumulator = 0
+  bodyTails.length = Math.min(bodies.length, orbitSettings.maxTailedBodies)
+  for (let i = 0; i < bodyTails.length; i++) bodyTails[i] = [{...bodies[i].pos}]
+}
+
+function setBodyCount(count: number) {
+  orbitSettings.bodyCount = Math.max(2, Math.round(count))
+  resetOrbit()
+}
+
+function accelerations(): Vec[] {
+  const result = bodies.map(() => ({x: 0, y: 0}))
+  for (let i = 0; i < bodies.length - 1; i++) {
+    for (let j = i + 1; j < bodies.length; j++) {
+      const dx = bodies[j].pos.x - bodies[i].pos.x
+      const dy = bodies[j].pos.y - bodies[i].pos.y
+      const distanceSquared = dx * dx + dy * dy + 1
+      const inverseDistanceCubed = 1 / (distanceSquared * Math.sqrt(distanceSquared))
+      result[i].x += G * bodies[j].mass * dx * inverseDistanceCubed
+      result[i].y += G * bodies[j].mass * dy * inverseDistanceCubed
+      result[j].x -= G * bodies[i].mass * dx * inverseDistanceCubed
+      result[j].y -= G * bodies[i].mass * dy * inverseDistanceCubed
+    }
+  }
+  return result
+}
+
+function resolveCollisions() {
+  for (let i = 0; i < bodies.length - 1; i++) {
+    for (let j = i + 1; j < bodies.length; j++) {
+      const first = bodies[i]
+      const second = bodies[j]
+      const dx = second.pos.x - first.pos.x
+      const dy = second.pos.y - first.pos.y
+      const distance = Math.hypot(dx, dy)
+      const collisionDistance = first.radius + second.radius
+      if (distance >= collisionDistance) continue
+
+      // Use a deterministic normal if two centers happen to be exactly equal.
+      const normalX = distance > 1e-9 ? dx / distance : 1
+      const normalY = distance > 1e-9 ? dy / distance : 0
+      const inverseMassFirst = 1 / first.mass
+      const inverseMassSecond = 1 / second.mass
+      const inverseMassSum = inverseMassFirst + inverseMassSecond
+      const overlap = collisionDistance - distance
+      const correction = overlap * collisionSettings.correctionPercent / inverseMassSum
+
+      first.pos.x -= normalX * correction * inverseMassFirst
+      first.pos.y -= normalY * correction * inverseMassFirst
+      second.pos.x += normalX * correction * inverseMassSecond
+      second.pos.y += normalY * correction * inverseMassSecond
+
+      const relativeVelocityX = second.velocity.x - first.velocity.x
+      const relativeVelocityY = second.velocity.y - first.velocity.y
+      const velocityAlongNormal = relativeVelocityX * normalX + relativeVelocityY * normalY
+      if (velocityAlongNormal >= 0) continue
+
+      const impulseMagnitude = -(1 + collisionSettings.restitution) * velocityAlongNormal / inverseMassSum
+      const impulseX = impulseMagnitude * normalX
+      const impulseY = impulseMagnitude * normalY
+      first.velocity.x -= impulseX * inverseMassFirst
+      first.velocity.y -= impulseY * inverseMassFirst
+      second.velocity.x += impulseX * inverseMassSecond
+      second.velocity.y += impulseY * inverseMassSecond
+    }
+  }
+}
+
+function getEffectivePhysicsDt(requestedDt: number) {
+  if (!precisionSettings.adaptiveDt) return {dt: requestedDt, reason: 'none'}
+
+  let result = {dt: requestedDt, reason: 'none'}
+  for (let i = 0; i < bodies.length - 1; i++) {
+    for (let j = i + 1; j < bodies.length; j++) {
+      const relativePos = {x: bodies[j].pos.x - bodies[i].pos.x, y: bodies[j].pos.y - bodies[i].pos.y}
+      const relativeVelocity = {x: bodies[j].velocity.x - bodies[i].velocity.x, y: bodies[j].velocity.y - bodies[i].velocity.y}
+      const distance = Math.max(1e-9, Math.hypot(relativePos.x, relativePos.y))
+      const relativeSpeed = Math.hypot(relativeVelocity.x, relativeVelocity.y)
+      const mu = G * (bodies[i].mass + bodies[j].mass)
+      const gravityDt = precisionSettings.gravityStepFraction * Math.sqrt(distance ** 3 / mu)
+      const speedDt = relativeSpeed > 0 ? precisionSettings.maxTravelFraction * distance / relativeSpeed : Infinity
+      if (gravityDt < result.dt) result = {dt: gravityDt, reason: 'close gravity'}
+      if (speedDt < result.dt) result = {dt: speedDt, reason: 'relative speed'}
+
+      const radialAccelerationScale = -mu / distance ** 3
+      const predictedPos = {
+        x: relativePos.x + relativeVelocity.x * result.dt + relativePos.x * radialAccelerationScale * result.dt ** 2 / 2,
+        y: relativePos.y + relativeVelocity.y * result.dt + relativePos.y * radialAccelerationScale * result.dt ** 2 / 2
+      }
+      const predictedDistance = Math.max(1e-9, Math.hypot(predictedPos.x, predictedPos.y))
+      const cosine = Math.max(-1, Math.min(1,
+        (relativePos.x * predictedPos.x + relativePos.y * predictedPos.y) / (distance * predictedDistance)
+      ))
+      const sweptAngle = Math.acos(cosine)
+      const maxAngle = precisionSettings.maxAngleDegrees * Math.PI / 180
+      if (maxAngle > 0 && sweptAngle > maxAngle) {
+        result = {dt: result.dt * maxAngle / sweptAngle, reason: 'orbit angle'}
+      }
+    }
+  }
+
+  result.dt = Math.min(requestedDt, Math.max(precisionSettings.minimumDt, result.dt))
+  return result
+}
+
+// A fixed-step velocity-Verlet integrator is substantially more stable than Euler for orbits.
+function doPhysics(deltaTime: number) {
+  const before = accelerations()
+  bodies.forEach((body, index) => {
+    body.velocity.x += before[index].x * deltaTime / 2
+    body.velocity.y += before[index].y * deltaTime / 2
+    body.pos.x += body.velocity.x * deltaTime
+    body.pos.y += body.velocity.y * deltaTime
+  })
+  if (collisionSettings.enabled) resolveCollisions()
+  const after = accelerations()
+  bodies.forEach((body, index) => {
+    body.velocity.x += after[index].x * deltaTime / 2
+    body.velocity.y += after[index].y * deltaTime / 2
+  })
+}
+
+function resizeCanvas() {
+  const pixelRatio = devicePixelRatio || 1
+  canvas.width = Math.round(innerWidth * pixelRatio)
+  canvas.height = Math.round(innerHeight * pixelRatio)
+  ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
+}
+
+function mapToCanvas(pos: Vec): Vec {
+  return {x: innerWidth / 2 + pos.x * orbitSettings.pixelsPerMeter, y: innerHeight / 2 + pos.y * orbitSettings.pixelsPerMeter}
+}
+
+function render() {
+  ctx.clearRect(0, 0, innerWidth, innerHeight)
+  bodyTails.forEach((tail, bodyIndex) => {
+    if (tail.length < 2) return
+    ctx.save()
+    ctx.globalAlpha = 0.65
+    ctx.strokeStyle = bodies[bodyIndex].color
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    tail.forEach((point, pointIndex) => {
+      const canvasPoint = mapToCanvas(point)
+      if (pointIndex === 0) ctx.moveTo(canvasPoint.x, canvasPoint.y)
+      else ctx.lineTo(canvasPoint.x, canvasPoint.y)
+    })
+    ctx.stroke()
+    ctx.restore()
+  })
+
+  bodies.forEach(body => {
+    const pos = mapToCanvas(body.pos)
+    ctx.fillStyle = body.color
+    ctx.beginPath()
+    ctx.arc(pos.x, pos.y, Math.max(3, body.radius * orbitSettings.pixelsPerMeter), 0, Math.PI * 2)
+    ctx.fill()
+  })
+}
+
+const timeFolder = pane.addFolder({title: 'Time'})
+timeFolder.addBinding(timing, 'realTimeElapsed', {label: 'real elapsed', readonly: true, format: (v: number) => `${v.toFixed(2)} s`})
+timeFolder.addBinding(timing, 'simulationTimeElapsed', {label: 'simulation elapsed', readonly: true, format: (v: number) => `${v.toFixed(2)} s`})
+timeFolder.addBinding(timing, 'physicsDt', {label: 'physics dt', min: 0.001, max: 2, step: 0.001, format: (v: number) => `${v.toFixed(3)} s`})
+timeFolder.addBinding(timing, 'effectivePhysicsDt', {label: 'effective dt', readonly: true, format: (v: number) => `${v.toFixed(4)} s`})
+timeFolder.addBinding(timing, 'forcedSmallerDt', {label: 'dt forced smaller', readonly: true})
+timeFolder.addBinding(timing, 'dtLimitReason', {label: 'dt limit', readonly: true})
+timeFolder.addBinding(timing, 'timeSpeed', {label: 'time speed', min: 0, max: 100, step: 0.1, format: (v: number) => `${v.toFixed(1)}x`})
+timeFolder.addButton({title: 'Pause / resume'}).on('click', () => {
+  timing.paused = !timing.paused
+  accumulator = 0
+})
+timeFolder.addBinding(timing, 'paused', {readonly: true})
+
+const precisionFolder = pane.addFolder({title: 'Physics precision'})
+precisionFolder.addBinding(precisionSettings, 'adaptiveDt', {label: 'adaptive dt'})
+precisionFolder.addBinding(precisionSettings, 'minimumDt', {label: 'minimum dt', min: 0.00001, max: 0.1, step: 0.00001})
+precisionFolder.addBinding(precisionSettings, 'gravityStepFraction', {label: 'gravity fraction', min: 0.001, max: 0.2, step: 0.001})
+precisionFolder.addBinding(precisionSettings, 'maxTravelFraction', {label: 'max travel / dist', min: 0.001, max: 0.5, step: 0.001})
+precisionFolder.addBinding(precisionSettings, 'maxAngleDegrees', {label: 'max angle', min: 0.1, max: 30, step: 0.1, format: (v: number) => `${v.toFixed(1)} deg`})
+
+const collisionFolder = pane.addFolder({title: 'Collisions'})
+collisionFolder.addBinding(collisionSettings, 'enabled')
+collisionFolder.addBinding(collisionSettings, 'restitution', {label: 'bounciness', min: 0, max: 1, step: 0.01})
+collisionFolder.addBinding(collisionSettings, 'correctionPercent', {label: 'separation correction', min: 0.1, max: 1, step: 0.05})
+
+const orbitFolder = pane.addFolder({title: 'Bodies and orbit'})
+orbitFolder.addBinding(orbitSettings, 'bodyCount', {label: 'body count', min: 2, max: 1000, step: 1})
+orbitFolder.addBinding(orbitSettings, 'largeMass', {label: 'large mass', min: 1e10, max: 1e16, format: (v: number) => v.toExponential(3)})
+orbitFolder.addBinding(orbitSettings, 'smallMass', {label: 'small mass', min: 1e7, max: 1e13, format: (v: number) => v.toExponential(3)})
+orbitFolder.addBinding(orbitSettings, 'separation', {min: 25, max: 300, step: 1, format: (v: number) => `${v.toFixed(0)} m`})
+orbitFolder.addBinding(orbitSettings, 'pixelsPerMeter', {label: 'view scale', min: 0.25, max: 4, step: 0.05})
+orbitFolder.addBinding(orbitSettings, 'tailLength', {label: 'tail points', min: 10, max: 5000, step: 10})
+orbitFolder.addBinding(orbitSettings, 'tailSampleInterval', {label: 'tail sample', min: 0.01, max: 2, step: 0.01, format: (v: number) => `${v.toFixed(2)} s`})
+orbitFolder.addBinding(orbitSettings, 'maxTailedBodies', {label: 'bodies with tails', min: 0, max: 100, step: 1})
+orbitFolder.addButton({title: 'Generate bodies / reset'}).on('click', () => setBodyCount(orbitSettings.bodyCount))
+
+const paneStorageKey = 'gravity-simulation-pane'
+const savePaneSettings = () => localStorage.setItem(paneStorageKey, JSON.stringify(pane.exportState()))
+const savedPaneSettings = localStorage.getItem(paneStorageKey)
+if (savedPaneSettings) {
+  try { pane.importState(JSON.parse(savedPaneSettings)) }
+  catch { localStorage.removeItem(paneStorageKey) }
+}
+pane.on('change', savePaneSettings)
+addEventListener('pagehide', savePaneSettings)
+
+function frame(now: number) {
+  fpsGraph.begin()
+  const realTimeDt = Math.max(0, (now - lastTime) / 1000)
+  lastTime = now
+  timing.realTimeElapsed += realTimeDt
+  if (!timing.paused) {
+    accumulator += Math.min(realTimeDt, 0.25) * timing.timeSpeed
+    let physicsDuration = 0
+    let physicsSteps = 0
+    while (true) {
+      const effectiveStep = getEffectivePhysicsDt(timing.physicsDt)
+      timing.effectivePhysicsDt = effectiveStep.dt
+      timing.forcedSmallerDt = effectiveStep.dt < timing.physicsDt * (1 - 1e-9)
+      timing.dtLimitReason = timing.forcedSmallerDt ? effectiveStep.reason : 'none'
+      if (accumulator < effectiveStep.dt) break
+
+      const physicsStart = performance.now()
+      doPhysics(effectiveStep.dt)
+      physicsDuration += performance.now() - physicsStart
+      timing.simulationTimeElapsed += effectiveStep.dt
+      accumulator -= effectiveStep.dt
+      physicsSteps++
+
+      tailSampleAccumulator += effectiveStep.dt
+      if (tailSampleAccumulator >= orbitSettings.tailSampleInterval) {
+        bodyTails.forEach((tail, index) => {
+          const body = bodies[index]
+          tail.push({...body.pos})
+          const overflow = tail.length - orbitSettings.tailLength
+          if (overflow > 0) tail.splice(0, overflow)
+        })
+        tailSampleAccumulator %= orbitSettings.tailSampleInterval
+      }
+    }
+    if (physicsSteps > 0) {
+      const averageThisFrame = physicsDuration / physicsSteps
+      performanceStats.averagePhysicsMs = performanceStats.averagePhysicsMs === 0
+        ? averageThisFrame
+        : performanceStats.averagePhysicsMs * 0.9 + averageThisFrame * 0.1
+    }
+  }
+  render()
+  pane.refresh()
+  fpsGraph.end()
+  requestAnimationFrame(frame)
+}
+
+resizeCanvas()
+resetOrbit()
+addEventListener('resize', resizeCanvas)
+requestAnimationFrame(frame)
