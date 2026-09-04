@@ -209,6 +209,30 @@ export class CanvasHelper {
       this.ctx.stroke()
     }
   }
+
+  drawEllipse = ({
+    pos: {x, y},
+    radiusX,
+    radiusY,
+    rotation = 0,
+    strokeScale = 1,
+    strokeColor = '#fff'
+  }: {
+    pos: Vec,
+    radiusX: number,
+    radiusY: number,
+    rotation?: number,
+    strokeScale?: number,
+    strokeColor?: CanvasColor
+  }) => {
+    if(!this.ctx) return
+
+    this.ctx.beginPath()
+    this.ctx.ellipse(x, y, radiusX, radiusY, rotation, 0, Math.PI * 2)
+    this.ctx.lineWidth = strokeScale
+    this.ctx.strokeStyle = strokeColor
+    this.ctx.stroke()
+  }
   
   drawVector = ({
     pos: {x, y},

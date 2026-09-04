@@ -46,33 +46,49 @@ const frameRate = {
 }
 
 let keplerOrbit: KeplerOrbit | undefined
-const orbitInfo = { period: 0 }
+let orbitFocusedBody: Particle | undefined
+let selectedOrbitPartner: Particle | undefined
+let orbitPartnerBinding: any
+const orbitInfo = {
+  focusedBody: 'none', partnerBody: 'none',
+  periapsis: 1, apoapsis: 1,
+  orientation: 0, phase: 0,
+  clockwise: false, period: 0
+}
 let orbitSettingsReady = false
 
 const setupOrbitSettings = () => {
-  if (orbitSettingsReady || !keplerOrbit) return
+  if (orbitSettingsReady) return
   orbitSettingsReady = true
 
   const resetOrbit = () => {
     if (!keplerOrbit) return
+    Object.assign(keplerOrbit.params, {
+      periapsis: orbitInfo.periapsis,
+      apoapsis: orbitInfo.apoapsis,
+      orientation: orbitInfo.orientation,
+      phase: orbitInfo.phase,
+      clockwise: orbitInfo.clockwise
+    })
     keplerOrbit.resetEpoch(_game_params.simulationAge)
     keplerOrbit.update(_game_params.simulationAge)
     orbitInfo.period = keplerOrbit.period
   }
 
-  orbitSettingsFolder.addBinding(keplerOrbit.params, 'periapsis', {
+  orbitSettingsFolder.addBinding(orbitInfo, 'focusedBody', { label: 'focused', readonly: true })
+  orbitSettingsFolder.addBinding(orbitInfo, 'periapsis', {
     label: 'lowest distance', min: 1, format: (value: number) => number2MS(value, metricalIMS, 'm', 3)
   }).on('change', resetOrbit)
-  orbitSettingsFolder.addBinding(keplerOrbit.params, 'apoapsis', {
+  orbitSettingsFolder.addBinding(orbitInfo, 'apoapsis', {
     label: 'highest distance', min: 1, format: (value: number) => number2MS(value, metricalIMS, 'm', 3)
   }).on('change', resetOrbit)
-  orbitSettingsFolder.addBinding(keplerOrbit.params, 'orientation', {
+  orbitSettingsFolder.addBinding(orbitInfo, 'orientation', {
     min: -180, max: 180, step: 1, format: (value: number) => value.toFixed(0) + '°'
   }).on('change', resetOrbit)
-  orbitSettingsFolder.addBinding(keplerOrbit.params, 'phase', {
+  orbitSettingsFolder.addBinding(orbitInfo, 'phase', {
     min: 0, max: 360, step: 1, format: (value: number) => value.toFixed(0) + '°'
   }).on('change', resetOrbit)
-  orbitSettingsFolder.addBinding(keplerOrbit.params, 'clockwise').on('change', resetOrbit)
+  orbitSettingsFolder.addBinding(orbitInfo, 'clockwise').on('change', resetOrbit)
   orbitSettingsFolder.addBinding(orbitInfo, 'period', {
     readonly: true,
     format: (value: number) => {
@@ -80,25 +96,108 @@ const setupOrbitSettings = () => {
       return `${time.years}y ${time.days}d ${time.hours}h`
     }
   })
+}
+
+const getKeplerPartners = (focusedBody: Particle) => {
+  return particles.filter(body => {
+    if (body === focusedBody) return false
+    const distance = distanceBetweenVec(focusedBody.pos, body.pos)
+    const relativeVelocity = {
+      x: focusedBody.velocity.x - body.velocity.x,
+      y: focusedBody.velocity.y - body.velocity.y
+    }
+    const mu = GAME_PARAMS.gravity * (focusedBody.mass + body.mass)
+    return vecMagnitude(relativeVelocity) ** 2 / 2 - mu / distance < 0
+  })
+}
+
+const findOrbitPartner = (focusedBody: Particle) => {
+  return getKeplerPartners(focusedBody).reduce<Particle | undefined>((best, body) => {
+    if (!best) return body
+    const score = (candidate: Particle) => {
+      const distance = distanceBetweenVec(focusedBody.pos, candidate.pos)
+      return GAME_PARAMS.gravity * (focusedBody.mass + candidate.mass) / distance ** 3
+    }
+    return score(body) > score(best) ? body : best
+  }, undefined)
+}
+
+const setupOrbitPartnerDropdown = (focusedBody: Particle) => {
+  orbitPartnerBinding?.dispose()
+
+  const candidates = getKeplerPartners(focusedBody)
+  const options = candidates.reduce<Record<string, string>>((result, body) => {
+    const index = particles.indexOf(body)
+    const name = body.label ?? `body ${index + 1}`
+    result[`${name} [${index}]`] = index.toString()
+    return result
+  }, {})
+
+  selectedOrbitPartner = findOrbitPartner(focusedBody)
+  orbitInfo.partnerBody = selectedOrbitPartner
+    ? particles.indexOf(selectedOrbitPartner).toString()
+    : 'none'
+
+  orbitPartnerBinding = orbitSettingsFolder.addBinding(orbitInfo, 'partnerBody', {
+    label: 'orbit partner',
+    options
+  }).on('change', ({value}: {value: string}) => {
+    selectedOrbitPartner = particles[Number(value)]
+    keplerOrbit = undefined
+  })
+}
+
+const syncKeplerOrbitForFocus = () => {
+  const focusedBody = camera.focusedBody ?? (particles.length === 2 ? particles[1] : undefined)
+
+  if (!focusedBody) {
+    orbitInfo.focusedBody = 'none'
+    orbitInfo.partnerBody = 'none'
+    keplerOrbit = undefined
+    orbitFocusedBody = undefined
+    selectedOrbitPartner = undefined
+    orbitPartnerBinding?.dispose()
+    orbitPartnerBinding = undefined
+    return
+  }
+
+  if (focusedBody && orbitFocusedBody !== focusedBody) {
+    setupOrbitPartnerDropdown(focusedBody)
+  }
+
+  const partnerBody = focusedBody && selectedOrbitPartner !== focusedBody
+    ? selectedOrbitPartner
+    : undefined
+
+  if (!partnerBody || GAME_PARAMS.simulationMode === 'numerical') {
+    orbitInfo.focusedBody = focusedBody.label ?? 'unnamed'
+    keplerOrbit = undefined
+    orbitFocusedBody = focusedBody
+    return
+  }
+
+  const pairChanged = !keplerOrbit || orbitFocusedBody !== focusedBody ||
+    ![keplerOrbit.primary, keplerOrbit.secondary].includes(focusedBody) ||
+    ![keplerOrbit.primary, keplerOrbit.secondary].includes(partnerBody)
+  if (!pairChanged) return
+
+  const primary = focusedBody.mass >= partnerBody.mass ? focusedBody : partnerBody
+  const secondary = primary === focusedBody ? partnerBody : focusedBody
+  keplerOrbit = new KeplerOrbit(primary, secondary, _game_params.simulationAge)
+  orbitFocusedBody = focusedBody
+  orbitInfo.focusedBody = focusedBody.label ?? 'unnamed'
+  Object.assign(orbitInfo, keplerOrbit.params)
   orbitInfo.period = keplerOrbit.period
 }
+
+setupOrbitSettings()
 
 const loopInterval = getIntervalChangableDelay(() => {
   frameRate.tpsgraph.begin()
 
   for (let i = 0; i < 1; i++) {
-    const useKepler = particles.length === 2 && GAME_PARAMS.simulationMode !== 'numerical'
-
-    if (useKepler) {
-      if (!keplerOrbit || keplerOrbit.primary !== particles[0] || keplerOrbit.secondary !== particles[1]) {
-        keplerOrbit = new KeplerOrbit(particles[0], particles[1], _game_params.simulationAge)
-        setupOrbitSettings()
-      }
-      _game_params.simulationSpeed = GAME_PARAMS.simulationSpeed
-      _game_params.simulationAge += _game_params.simulationSpeed
-      keplerOrbit.update(_game_params.simulationAge)
-      continue
-    }
+    syncKeplerOrbitForFocus()
+    const keplerBodies = keplerOrbit ? [keplerOrbit.primary, keplerOrbit.secondary] : []
 
     let BHRoot: BarnesHutRootType
 
@@ -109,6 +208,8 @@ const loopInterval = getIntervalChangableDelay(() => {
     const minSimSpeed: number[] = []
 
     for (const particle of particles) {
+      if (keplerBodies.includes(particle)) continue
+
       let bodies = particles
       if (GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') bodies = simplifyBodiesForTarget(particle, BHRoot, GAME_PARAMS.barnesHutThreshold) as any
 
@@ -145,8 +246,17 @@ const loopInterval = getIntervalChangableDelay(() => {
     const min = Math.min(...minSimSpeed, GAME_PARAMS.simulationSpeed) || 1
 
     _game_params.simulationSpeed = min
+    keplerOrbit?.update(_game_params.simulationAge + _game_params.simulationSpeed)
 
     for (const particle of particles) {
+
+      if (keplerBodies.includes(particle)) {
+        if (particle === camera.focusedBody) {
+          const gravityForces = getAllGravityForces(particle, particles)
+          _game_params.camera.focusBodyGravityPoints = getGravityBodies2body(gravityForces, GAME_PARAMS.minCountedGravityVeclocity)
+        }
+        continue
+      }
 
       let bodies = particles
       if (GAME_PARAMS.gravityAlgorithmType === 'barnes-hut') bodies = simplifyBodiesForTarget(particle, BHRoot, GAME_PARAMS.barnesHutThreshold) as any
@@ -175,6 +285,12 @@ const loopInterval = getIntervalChangableDelay(() => {
 const renderInterval = getIntervalChangableDelay(() => {
   frameRate.fpsgraph.begin()
   canvasHelper.ctx?.clearRect(0, 0, canvas.width, canvas.height)
+  keplerOrbit?.getTrajectories(_game_params.simulationAge).forEach(trajectory => {
+    camera.drawTrajectoryEllipse({
+      ...trajectory,
+      color: trajectory.body === camera.focusedBody ? '#ffffff' : '#888888'
+    })
+  })
   camera.render({ debug: true })
   camera.canvasHelper.drawCursor()
   frameRate.fpsgraph.end()

@@ -98,6 +98,47 @@ export class KeplerOrbit {
     return 2 * Math.PI * Math.sqrt(semiMajorAxis ** 3 / mu)
   }
 
+  getTrajectories = (time: number) => {
+    const periapsis = Math.max(1, Math.min(this.params.periapsis, this.params.apoapsis))
+    const apoapsis = Math.max(periapsis, this.params.apoapsis)
+    const semiMajorAxis = (periapsis + apoapsis) / 2
+    const eccentricity = (apoapsis - periapsis) / (apoapsis + periapsis)
+    const semiMinorAxis = semiMajorAxis * Math.sqrt(1 - eccentricity ** 2)
+    const orientation = this.params.orientation * Math.PI / 180
+    const relativeCenter = rotate({x: -semiMajorAxis * eccentricity, y: 0}, orientation)
+    const elapsed = time - this.epoch
+    const centerOfMass = {
+      x: this.centerPos.x + this.centerVelocity.x * elapsed,
+      y: this.centerPos.y + this.centerVelocity.y * elapsed
+    }
+    const totalMass = this.primary.mass + this.secondary.mass
+    const primaryShare = this.secondary.mass / totalMass
+    const secondaryShare = this.primary.mass / totalMass
+
+    return [
+      {
+        body: this.primary,
+        center: {
+          x: centerOfMass.x - relativeCenter.x * primaryShare,
+          y: centerOfMass.y - relativeCenter.y * primaryShare
+        },
+        semiMajorAxis: semiMajorAxis * primaryShare,
+        semiMinorAxis: semiMinorAxis * primaryShare,
+        orientation
+      },
+      {
+        body: this.secondary,
+        center: {
+          x: centerOfMass.x + relativeCenter.x * secondaryShare,
+          y: centerOfMass.y + relativeCenter.y * secondaryShare
+        },
+        semiMajorAxis: semiMajorAxis * secondaryShare,
+        semiMinorAxis: semiMinorAxis * secondaryShare,
+        orientation
+      }
+    ]
+  }
+
   update = (time: number) => {
     const periapsis = Math.max(1, Math.min(this.params.periapsis, this.params.apoapsis))
     const apoapsis = Math.max(periapsis, this.params.apoapsis)

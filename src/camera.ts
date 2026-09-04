@@ -177,6 +177,23 @@ export class Camera {
     }
   }
 
+  drawTrajectoryEllipse = ({center, semiMajorAxis, semiMinorAxis, orientation, color}: {
+    center: Vec,
+    semiMajorAxis: number,
+    semiMinorAxis: number,
+    orientation: number,
+    color: CanvasColor
+  }) => {
+    this.canvasHelper.drawEllipse({
+      pos: this.map2CameraPos(center),
+      radiusX: this.map2CameraSize(semiMajorAxis).value,
+      radiusY: this.map2CameraSize(semiMinorAxis).value,
+      rotation: orientation,
+      strokeScale: 1,
+      strokeColor: color
+    })
+  }
+
   drawVector = ({
     pos,
     posTo,
