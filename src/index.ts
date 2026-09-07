@@ -1,5 +1,6 @@
 import {Pane} from 'tweakpane'
 import * as TweakpaneEssentials from '@tweakpane/plugin-essentials'
+import {GpuGravity} from './gpu-gravity'
 
 type Vec = {x: number, y: number}
 type Body = {mass: number, radius: number, color: string, pos: Vec, velocity: Vec}
@@ -14,13 +15,22 @@ if (!ctx) throw new Error('2D canvas context is unavailable')
 const pane = new Pane({title: 'N-body simulation', container: paneContainer ?? undefined})
 pane.registerPlugin(TweakpaneEssentials)
 
-const performanceStats = {averagePhysicsMs: 0}
+const performanceStats = {averagePhysicsMs: 0, gravityBackend: 'checking', gpuBatching: 'off'}
+const gpuSettings = {backend: 'auto' as 'auto' | 'cpu' | 'webgpu', minimumBodies: 256, maxBatchSteps: 128}
 const performanceFolder = pane.addFolder({title: 'Performance'})
 const fpsGraph = performanceFolder.addBlade({view: 'fpsgraph', label: 'FPS'}) as any
 performanceFolder.addBinding(performanceStats, 'averagePhysicsMs', {
   label: 'avg physics', view: 'graph', readonly: true, min: 0, max: 100,
   format: (value: number) => `${value.toFixed(4)} ms`
 })
+performanceFolder.addBinding(gpuSettings, 'backend', {
+  label: 'gravity backend',
+  options: {Auto: 'auto', CPU: 'cpu', WebGPU: 'webgpu'}
+})
+performanceFolder.addBinding(gpuSettings, 'minimumBodies', {label: 'GPU threshold', min: 2, max: 1000, step: 1})
+performanceFolder.addBinding(gpuSettings, 'maxBatchSteps', {label: 'max batch steps', min: 1, max: 1000, step: 1})
+performanceFolder.addBinding(performanceStats, 'gravityBackend', {label: 'using', readonly: true})
+performanceFolder.addBinding(performanceStats, 'gpuBatching', {label: 'GPU batching', readonly: true})
 
 const timing = {
   realTimeElapsed: 0,
@@ -55,6 +65,8 @@ const orbitSettings = {
   maxTailedBodies: 20
 }
 const bodies: Body[] = []
+let gpuGravity: GpuGravity | null = null
+let cachedAccelerations: Vec[] | null = null
 
 let accumulator = 0
 let lastTime = performance.now()
@@ -102,6 +114,7 @@ function resetOrbit() {
   tailSampleAccumulator = 0
   bodyTails.length = Math.min(bodies.length, orbitSettings.maxTailedBodies)
   for (let i = 0; i < bodyTails.length; i++) bodyTails[i] = [{...bodies[i].pos}]
+  cachedAccelerations = null
 }
 
 function setBodyCount(count: number) {
@@ -109,7 +122,7 @@ function setBodyCount(count: number) {
   resetOrbit()
 }
 
-function accelerations(): Vec[] {
+function accelerationsCpu(): Vec[] {
   const result = bodies.map(() => ({x: 0, y: 0}))
   for (let i = 0; i < bodies.length - 1; i++) {
     for (let j = i + 1; j < bodies.length; j++) {
@@ -124,6 +137,28 @@ function accelerations(): Vec[] {
     }
   }
   return result
+}
+
+function shouldUseGpu() {
+  return gpuSettings.backend === 'webgpu' ||
+    (gpuSettings.backend === 'auto' && bodies.length >= gpuSettings.minimumBodies)
+}
+
+async function accelerations(): Promise<Vec[]> {
+  const useGpu = shouldUseGpu()
+  if (useGpu && gpuGravity) {
+    try {
+      performanceStats.gravityBackend = 'WebGPU'
+      return await gpuGravity.calculate(bodies)
+    } catch (error) {
+      console.warn('WebGPU gravity failed; switching to CPU.', error)
+      gpuGravity = null
+    }
+  }
+  performanceStats.gravityBackend = useGpu && !gpuGravity
+    ? 'CPU (WebGPU unavailable)'
+    : 'CPU'
+  return accelerationsCpu()
 }
 
 function resolveCollisions() {
@@ -205,8 +240,11 @@ function getEffectivePhysicsDt(requestedDt: number) {
 }
 
 // A fixed-step velocity-Verlet integrator is substantially more stable than Euler for orbits.
-function doPhysics(deltaTime: number) {
-  const before = accelerations()
+async function doPhysics(deltaTime: number) {
+  // The acceleration calculated at the end of the previous Verlet step is
+  // also the acceleration at the beginning of this one. Reusing it halves
+  // GPU submissions and readbacks after the first step.
+  const before = cachedAccelerations ?? await accelerations()
   bodies.forEach((body, index) => {
     body.velocity.x += before[index].x * deltaTime / 2
     body.velocity.y += before[index].y * deltaTime / 2
@@ -214,11 +252,12 @@ function doPhysics(deltaTime: number) {
     body.pos.y += body.velocity.y * deltaTime
   })
   if (collisionSettings.enabled) resolveCollisions()
-  const after = accelerations()
+  const after = await accelerations()
   bodies.forEach((body, index) => {
     body.velocity.x += after[index].x * deltaTime / 2
     body.velocity.y += after[index].y * deltaTime / 2
   })
+  cachedAccelerations = after
 }
 
 function resizeCanvas() {
@@ -306,7 +345,18 @@ if (savedPaneSettings) {
 pane.on('change', savePaneSettings)
 addEventListener('pagehide', savePaneSettings)
 
-function frame(now: number) {
+function recordTail(elapsedSimulationTime: number) {
+  tailSampleAccumulator += elapsedSimulationTime
+  if (tailSampleAccumulator < orbitSettings.tailSampleInterval) return
+  bodyTails.forEach((tail, index) => {
+    tail.push({...bodies[index].pos})
+    const overflow = tail.length - orbitSettings.tailLength
+    if (overflow > 0) tail.splice(0, overflow)
+  })
+  tailSampleAccumulator %= orbitSettings.tailSampleInterval
+}
+
+async function frame(now: number) {
   fpsGraph.begin()
   const realTimeDt = Math.max(0, (now - lastTime) / 1000)
   lastTime = now
@@ -315,7 +365,40 @@ function frame(now: number) {
     accumulator += Math.min(realTimeDt, 0.25) * timing.timeSpeed
     let physicsDuration = 0
     let physicsSteps = 0
-    while (true) {
+    let usedBatch = false
+
+    if (gpuGravity && shouldUseGpu() && !precisionSettings.adaptiveDt && !collisionSettings.enabled) {
+      const batchSteps = Math.min(gpuSettings.maxBatchSteps, Math.floor(accumulator / timing.physicsDt))
+      timing.effectivePhysicsDt = timing.physicsDt
+      timing.forcedSmallerDt = false
+      timing.dtLimitReason = 'none'
+      performanceStats.gpuBatching = batchSteps > 1 ? `${batchSteps} steps` : 'ready'
+      usedBatch = true
+      if (batchSteps > 0) {
+        const physicsStart = performance.now()
+        try {
+          await gpuGravity.integrate(bodies, timing.physicsDt, batchSteps)
+          physicsDuration = performance.now() - physicsStart
+          physicsSteps = batchSteps
+          const simulatedTime = batchSteps * timing.physicsDt
+          timing.simulationTimeElapsed += simulatedTime
+          accumulator -= simulatedTime
+          cachedAccelerations = null
+          recordTail(simulatedTime)
+          performanceStats.gravityBackend = 'WebGPU batched'
+        } catch (error) {
+          console.warn('Batched WebGPU integration failed; switching to CPU.', error)
+          gpuGravity = null
+          usedBatch = false
+        }
+      }
+    } else {
+      performanceStats.gpuBatching = shouldUseGpu()
+        ? 'disable adaptive dt + collisions'
+        : 'off'
+    }
+
+    while (!usedBatch) {
       const effectiveStep = getEffectivePhysicsDt(timing.physicsDt)
       timing.effectivePhysicsDt = effectiveStep.dt
       timing.forcedSmallerDt = effectiveStep.dt < timing.physicsDt * (1 - 1e-9)
@@ -323,22 +406,13 @@ function frame(now: number) {
       if (accumulator < effectiveStep.dt) break
 
       const physicsStart = performance.now()
-      doPhysics(effectiveStep.dt)
+      await doPhysics(effectiveStep.dt)
       physicsDuration += performance.now() - physicsStart
       timing.simulationTimeElapsed += effectiveStep.dt
       accumulator -= effectiveStep.dt
       physicsSteps++
 
-      tailSampleAccumulator += effectiveStep.dt
-      if (tailSampleAccumulator >= orbitSettings.tailSampleInterval) {
-        bodyTails.forEach((tail, index) => {
-          const body = bodies[index]
-          tail.push({...body.pos})
-          const overflow = tail.length - orbitSettings.tailLength
-          if (overflow > 0) tail.splice(0, overflow)
-        })
-        tailSampleAccumulator %= orbitSettings.tailSampleInterval
-      }
+      recordTail(effectiveStep.dt)
     }
     if (physicsSteps > 0) {
       const averageThisFrame = physicsDuration / physicsSteps
@@ -356,4 +430,11 @@ function frame(now: number) {
 resizeCanvas()
 resetOrbit()
 addEventListener('resize', resizeCanvas)
-requestAnimationFrame(frame)
+
+async function start() {
+  gpuGravity = await GpuGravity.create(G)
+  performanceStats.gravityBackend = gpuGravity ? 'WebGPU ready' : 'CPU (WebGPU unavailable)'
+  requestAnimationFrame(frame)
+}
+
+start()
