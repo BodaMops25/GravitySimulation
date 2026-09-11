@@ -1,9 +1,10 @@
 import {Pane} from 'tweakpane'
 import * as TweakpaneEssentials from '@tweakpane/plugin-essentials'
 import {GpuGravity} from './gpu-gravity'
+import {createSolarSystemMap} from './solar-system-map'
 
 type Vec = {x: number, y: number}
-type Body = {mass: number, radius: number, color: string, pos: Vec, velocity: Vec}
+type Body = {name?: string, mass: number, radius: number, displayRadius?: number, color: string, pos: Vec, velocity: Vec}
 
 const G = 6.67430e-11
 const canvas = document.querySelector<HTMLCanvasElement>('#main-frame')
@@ -27,8 +28,8 @@ performanceFolder.addBinding(gpuSettings, 'backend', {
   label: 'gravity backend',
   options: {Auto: 'auto', CPU: 'cpu', WebGPU: 'webgpu'}
 })
-performanceFolder.addBinding(gpuSettings, 'minimumBodies', {label: 'GPU threshold', min: 2, max: 1000, step: 1})
-performanceFolder.addBinding(gpuSettings, 'maxBatchSteps', {label: 'max batch steps', min: 1, max: 1000, step: 1})
+performanceFolder.addBinding(gpuSettings, 'minimumBodies', {label: 'GPU threshold', step: 1})
+performanceFolder.addBinding(gpuSettings, 'maxBatchSteps', {label: 'max batch steps', step: 1})
 performanceFolder.addBinding(performanceStats, 'gravityBackend', {label: 'using', readonly: true})
 performanceFolder.addBinding(performanceStats, 'gpuBatching', {label: 'GPU batching', readonly: true})
 
@@ -55,6 +56,7 @@ const collisionSettings = {
   correctionPercent: 0.8
 }
 const orbitSettings = {
+  mapPreset: 'generated' as 'generated' | 'solar-system',
   bodyCount: 2,
   largeMass: 1e14,
   smallMass: 1e11,
@@ -74,16 +76,29 @@ let tailSampleAccumulator = 0
 const bodyTails: Vec[][] = []
 
 function resetOrbit() {
+  if (orbitSettings.mapPreset === 'solar-system') {
+    bodies.splice(0, bodies.length, ...createSolarSystemMap())
+    orbitSettings.bodyCount = bodies.length
+    timing.simulationTimeElapsed = 0
+    accumulator = 0
+    tailSampleAccumulator = 0
+    cachedAccelerations = null
+    bodyTails.length = Math.min(bodies.length, orbitSettings.maxTailedBodies)
+    for (let i = 0; i < bodyTails.length; i++) bodyTails[i] = [{...bodies[i].pos}]
+    return
+  }
+
   const count = Math.max(2, Math.round(orbitSettings.bodyCount))
   const goldenAngle = Math.PI * (3 - Math.sqrt(5))
   bodies.length = 0
-  bodies.push({mass: orbitSettings.largeMass, radius: 18, color: '#f6c85f', pos: {x: 0, y: 0}, velocity: {x: 0, y: 0}})
+  bodies.push({name: 'Central body', mass: orbitSettings.largeMass, radius: 18, color: '#f6c85f', pos: {x: 0, y: 0}, velocity: {x: 0, y: 0}})
 
   for (let i = 1; i < count; i++) {
     const distance = orbitSettings.separation * Math.sqrt(i)
     const angle = i === 1 ? 0 : i * goldenAngle
     const orbitalSpeed = Math.sqrt(G * orbitSettings.largeMass / distance)
     bodies.push({
+      name: `Body ${i + 1}`,
       mass: orbitSettings.smallMass,
       radius: count > 100 ? 2 : 6,
       color: `hsl(${(i * 137.5) % 360} 75% 65%)`,
@@ -293,7 +308,7 @@ function render() {
     const pos = mapToCanvas(body.pos)
     ctx.fillStyle = body.color
     ctx.beginPath()
-    ctx.arc(pos.x, pos.y, Math.max(3, body.radius * orbitSettings.pixelsPerMeter), 0, Math.PI * 2)
+    ctx.arc(pos.x, pos.y, body.displayRadius ?? Math.max(3, body.radius * orbitSettings.pixelsPerMeter), 0, Math.PI * 2)
     ctx.fill()
   })
 }
@@ -301,11 +316,11 @@ function render() {
 const timeFolder = pane.addFolder({title: 'Time'})
 timeFolder.addBinding(timing, 'realTimeElapsed', {label: 'real elapsed', readonly: true, format: (v: number) => `${v.toFixed(2)} s`})
 timeFolder.addBinding(timing, 'simulationTimeElapsed', {label: 'simulation elapsed', readonly: true, format: (v: number) => `${v.toFixed(2)} s`})
-timeFolder.addBinding(timing, 'physicsDt', {label: 'physics dt', min: 0.001, max: 2, step: 0.001, format: (v: number) => `${v.toFixed(3)} s`})
+timeFolder.addBinding(timing, 'physicsDt', {label: 'physics dt', format: (v: number) => `${v.toPrecision(4)} s`})
 timeFolder.addBinding(timing, 'effectivePhysicsDt', {label: 'effective dt', readonly: true, format: (v: number) => `${v.toFixed(4)} s`})
 timeFolder.addBinding(timing, 'forcedSmallerDt', {label: 'dt forced smaller', readonly: true})
 timeFolder.addBinding(timing, 'dtLimitReason', {label: 'dt limit', readonly: true})
-timeFolder.addBinding(timing, 'timeSpeed', {label: 'time speed', min: 0, max: 100, step: 0.1, format: (v: number) => `${v.toFixed(1)}x`})
+timeFolder.addBinding(timing, 'timeSpeed', {label: 'time speed', format: (v: number) => `${v.toPrecision(4)}x`})
 timeFolder.addButton({title: 'Pause / resume'}).on('click', () => {
   timing.paused = !timing.paused
   accumulator = 0
@@ -314,25 +329,28 @@ timeFolder.addBinding(timing, 'paused', {readonly: true})
 
 const precisionFolder = pane.addFolder({title: 'Physics precision'})
 precisionFolder.addBinding(precisionSettings, 'adaptiveDt', {label: 'adaptive dt'})
-precisionFolder.addBinding(precisionSettings, 'minimumDt', {label: 'minimum dt', min: 0.00001, max: 0.1, step: 0.00001})
-precisionFolder.addBinding(precisionSettings, 'gravityStepFraction', {label: 'gravity fraction', min: 0.001, max: 0.2, step: 0.001})
-precisionFolder.addBinding(precisionSettings, 'maxTravelFraction', {label: 'max travel / dist', min: 0.001, max: 0.5, step: 0.001})
-precisionFolder.addBinding(precisionSettings, 'maxAngleDegrees', {label: 'max angle', min: 0.1, max: 30, step: 0.1, format: (v: number) => `${v.toFixed(1)} deg`})
+precisionFolder.addBinding(precisionSettings, 'minimumDt', {label: 'minimum dt', step: 0.00001})
+precisionFolder.addBinding(precisionSettings, 'gravityStepFraction', {label: 'gravity fraction', step: 0.001})
+precisionFolder.addBinding(precisionSettings, 'maxTravelFraction', {label: 'max travel / dist', step: 0.001})
+precisionFolder.addBinding(precisionSettings, 'maxAngleDegrees', {label: 'max angle', step: 0.1, format: (v: number) => `${v.toFixed(1)} deg`})
 
 const collisionFolder = pane.addFolder({title: 'Collisions'})
 collisionFolder.addBinding(collisionSettings, 'enabled')
-collisionFolder.addBinding(collisionSettings, 'restitution', {label: 'bounciness', min: 0, max: 1, step: 0.01})
-collisionFolder.addBinding(collisionSettings, 'correctionPercent', {label: 'separation correction', min: 0.1, max: 1, step: 0.05})
+collisionFolder.addBinding(collisionSettings, 'restitution', {label: 'bounciness', step: 0.01})
+collisionFolder.addBinding(collisionSettings, 'correctionPercent', {label: 'separation correction', step: 0.05})
 
 const orbitFolder = pane.addFolder({title: 'Bodies and orbit'})
-orbitFolder.addBinding(orbitSettings, 'bodyCount', {label: 'body count', min: 2, max: 1000, step: 1})
-orbitFolder.addBinding(orbitSettings, 'largeMass', {label: 'large mass', min: 1e10, max: 1e16, format: (v: number) => v.toExponential(3)})
-orbitFolder.addBinding(orbitSettings, 'smallMass', {label: 'small mass', min: 1e7, max: 1e13, format: (v: number) => v.toExponential(3)})
-orbitFolder.addBinding(orbitSettings, 'separation', {min: 25, max: 300, step: 1, format: (v: number) => `${v.toFixed(0)} m`})
-orbitFolder.addBinding(orbitSettings, 'pixelsPerMeter', {label: 'view scale', min: 0.25, max: 4, step: 0.05})
-orbitFolder.addBinding(orbitSettings, 'tailLength', {label: 'tail points', min: 10, max: 5000, step: 10})
-orbitFolder.addBinding(orbitSettings, 'tailSampleInterval', {label: 'tail sample', min: 0.01, max: 2, step: 0.01, format: (v: number) => `${v.toFixed(2)} s`})
-orbitFolder.addBinding(orbitSettings, 'maxTailedBodies', {label: 'bodies with tails', min: 0, max: 100, step: 1})
+orbitFolder.addBinding(orbitSettings, 'mapPreset', {
+  label: 'map', options: {Generated: 'generated', 'Solar system': 'solar-system'}
+}).on('change', resetOrbit)
+orbitFolder.addBinding(orbitSettings, 'bodyCount', {label: 'body count', step: 1})
+orbitFolder.addBinding(orbitSettings, 'largeMass', {label: 'large mass', format: (v: number) => v.toExponential(3)})
+orbitFolder.addBinding(orbitSettings, 'smallMass', {label: 'small mass', format: (v: number) => v.toExponential(3)})
+orbitFolder.addBinding(orbitSettings, 'separation', {step: 1, format: (v: number) => `${v.toFixed(0)} m`})
+orbitFolder.addBinding(orbitSettings, 'pixelsPerMeter', {label: 'view scale', format: (v: number) => v.toExponential(2)})
+orbitFolder.addBinding(orbitSettings, 'tailLength', {label: 'tail points', step: 10})
+orbitFolder.addBinding(orbitSettings, 'tailSampleInterval', {label: 'tail sample', step: 0.01, format: (v: number) => `${v.toFixed(2)} s`})
+orbitFolder.addBinding(orbitSettings, 'maxTailedBodies', {label: 'bodies with tails', step: 1})
 orbitFolder.addButton({title: 'Generate bodies / reset'}).on('click', () => setBodyCount(orbitSettings.bodyCount))
 
 const paneStorageKey = 'gravity-simulation-pane'
