@@ -69,6 +69,9 @@ const orbitSettings = {
 const bodies: Body[] = []
 let gpuGravity: GpuGravity | null = null
 let cachedAccelerations: Vec[] | null = null
+const camera = {pos: {x: 0, y: 0}, focusedBodyIndex: -1}
+const cameraInfo = {focused: 'none'}
+const mousePosition = {x: innerWidth / 2, y: innerHeight / 2}
 
 let accumulator = 0
 let lastTime = performance.now()
@@ -76,6 +79,9 @@ let tailSampleAccumulator = 0
 const bodyTails: Vec[][] = []
 
 function resetOrbit() {
+  camera.focusedBodyIndex = -1
+  camera.pos = {x: 0, y: 0}
+  cameraInfo.focused = 'none'
   if (orbitSettings.mapPreset === 'solar-system') {
     bodies.splice(0, bodies.length, ...createSolarSystemMap())
     orbitSettings.bodyCount = bodies.length
@@ -283,7 +289,46 @@ function resizeCanvas() {
 }
 
 function mapToCanvas(pos: Vec): Vec {
-  return {x: innerWidth / 2 + pos.x * orbitSettings.pixelsPerMeter, y: innerHeight / 2 + pos.y * orbitSettings.pixelsPerMeter}
+  const center = getCameraCenter()
+  const scale = Math.max(1e-30, Math.abs(orbitSettings.pixelsPerMeter))
+  return {x: innerWidth / 2 + (pos.x - center.x) * scale, y: innerHeight / 2 + (pos.y - center.y) * scale}
+}
+
+function getCameraCenter(): Vec {
+  const focusedBody = bodies[camera.focusedBodyIndex]
+  return focusedBody
+    ? {x: focusedBody.pos.x + camera.pos.x, y: focusedBody.pos.y + camera.pos.y}
+    : {...camera.pos}
+}
+
+function setCameraCenter(center: Vec) {
+  const focusedBody = bodies[camera.focusedBodyIndex]
+  camera.pos = focusedBody
+    ? {x: center.x - focusedBody.pos.x, y: center.y - focusedBody.pos.y}
+    : {...center}
+}
+
+function canvasToMap(pos: Vec): Vec {
+  const center = getCameraCenter()
+  const scale = Math.max(1e-30, Math.abs(orbitSettings.pixelsPerMeter))
+  return {x: center.x + (pos.x - innerWidth / 2) / scale, y: center.y + (pos.y - innerHeight / 2) / scale}
+}
+
+function focusNearestBody() {
+  let nearestIndex = -1
+  let nearestDistance = 10
+  bodies.forEach((body, index) => {
+    const screenPos = mapToCanvas(body.pos)
+    const distance = Math.hypot(screenPos.x - mousePosition.x, screenPos.y - mousePosition.y)
+    if (distance <= nearestDistance) {
+      nearestDistance = distance
+      nearestIndex = index
+    }
+  })
+  if (nearestIndex < 0) return
+  camera.focusedBodyIndex = nearestIndex
+  camera.pos = {x: 0, y: 0}
+  cameraInfo.focused = bodies[nearestIndex].name ?? `Body ${nearestIndex + 1}`
 }
 
 function render() {
@@ -308,7 +353,7 @@ function render() {
     const pos = mapToCanvas(body.pos)
     ctx.fillStyle = body.color
     ctx.beginPath()
-    ctx.arc(pos.x, pos.y, body.displayRadius ?? Math.max(3, body.radius * orbitSettings.pixelsPerMeter), 0, Math.PI * 2)
+    ctx.arc(pos.x, pos.y, body.displayRadius ?? Math.max(3, body.radius * Math.abs(orbitSettings.pixelsPerMeter)), 0, Math.PI * 2)
     ctx.fill()
   })
 }
@@ -353,6 +398,15 @@ orbitFolder.addBinding(orbitSettings, 'tailSampleInterval', {label: 'tail sample
 orbitFolder.addBinding(orbitSettings, 'maxTailedBodies', {label: 'bodies with tails', step: 1})
 orbitFolder.addButton({title: 'Generate bodies / reset'}).on('click', () => setBodyCount(orbitSettings.bodyCount))
 
+const cameraFolder = pane.addFolder({title: 'Camera'})
+cameraFolder.addBinding(cameraInfo, 'focused', {readonly: true})
+cameraFolder.addButton({title: 'Remove focus'}).on('click', () => {
+  const center = getCameraCenter()
+  camera.focusedBodyIndex = -1
+  camera.pos = center
+  cameraInfo.focused = 'none'
+})
+
 const paneStorageKey = 'gravity-simulation-pane'
 const savePaneSettings = () => localStorage.setItem(paneStorageKey, JSON.stringify(pane.exportState()))
 const savedPaneSettings = localStorage.getItem(paneStorageKey)
@@ -362,6 +416,52 @@ if (savedPaneSettings) {
 }
 pane.on('change', savePaneSettings)
 addEventListener('pagehide', savePaneSettings)
+
+let isPanning = false
+let previousPointer = {x: 0, y: 0}
+canvas.addEventListener('pointermove', event => {
+  mousePosition.x = event.clientX
+  mousePosition.y = event.clientY
+  if (!isPanning) return
+  const scale = Math.max(1e-30, Math.abs(orbitSettings.pixelsPerMeter))
+  const center = getCameraCenter()
+  setCameraCenter({
+    x: center.x - (event.clientX - previousPointer.x) / scale,
+    y: center.y - (event.clientY - previousPointer.y) / scale
+  })
+  previousPointer = {x: event.clientX, y: event.clientY}
+})
+canvas.addEventListener('pointerdown', event => {
+  if (event.button !== 1 || !event.shiftKey) return
+  event.preventDefault()
+  isPanning = true
+  previousPointer = {x: event.clientX, y: event.clientY}
+  canvas.setPointerCapture(event.pointerId)
+})
+canvas.addEventListener('pointerup', event => {
+  if (event.button === 1) isPanning = false
+})
+canvas.addEventListener('pointercancel', () => { isPanning = false })
+canvas.addEventListener('auxclick', event => {
+  if (event.button === 1) event.preventDefault()
+})
+canvas.addEventListener('wheel', event => {
+  event.preventDefault()
+  const worldBefore = canvasToMap({x: event.clientX, y: event.clientY})
+  const oldCenter = getCameraCenter()
+  const oldScale = Math.max(1e-30, Math.abs(orbitSettings.pixelsPerMeter))
+  orbitSettings.pixelsPerMeter = oldScale * Math.exp(-event.deltaY * 0.0015)
+  const worldAfter = canvasToMap({x: event.clientX, y: event.clientY})
+  setCameraCenter({
+    x: oldCenter.x + worldBefore.x - worldAfter.x,
+    y: oldCenter.y + worldBefore.y - worldAfter.y
+  })
+}, {passive: false})
+addEventListener('keydown', event => {
+  const target = event.target as HTMLElement | null
+  if (target?.matches('input, textarea, select') || target?.isContentEditable) return
+  if (event.key.toLowerCase() === 'f') focusNearestBody()
+})
 
 function recordTail(elapsedSimulationTime: number) {
   tailSampleAccumulator += elapsedSimulationTime
